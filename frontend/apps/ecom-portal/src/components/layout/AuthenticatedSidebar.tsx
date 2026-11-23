@@ -1,0 +1,459 @@
+// Modified by Sekar Nagarajan (2026-11-16 12:55) — lock sidebar logo to Solverminds
+import { useAuthStore, usePermission, useTenantStore } from "@solverminds/auth";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import type { MenuProps } from "antd";
+import { Drawer, Layout, Menu, Tooltip } from "antd";
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { resolveAdminLandingSearch } from "../../features/admin/utils/admin-landing";
+import { useMenuCategories } from "../../features/auth/api/menu-access.queries";
+import {
+  appPathnameToMenuKey,
+  isPublicMenuKey,
+  menuKeyToAppPath,
+  menuKeyToOpenGroupKeys,
+} from "../../features/auth/utils/public-menu-access";
+import { AppIcon, Icons, NavIcons } from "../icons";
+import { NavAgencyApprovalIcon } from "../icons/nav-svg-icons";
+
+const { Sider } = Layout;
+
+const SIDEBAR_WIDTH = 250;
+const SIDEBAR_COLLAPSED_WIDTH = 80;
+const SOLVERMINDS_LOGO_URL = "/logo.png";
+const SOLVERMINDS_MARK_URL = "/solverminds-mark.png";
+
+function SidebarBrandBlock({ collapsed, isMobile }: { collapsed: boolean; isMobile: boolean }) {
+  const showFullLogo = !collapsed || isMobile;
+  // Temporary: always show Solverminds branding (ignore customer/tenant logoUrl).
+  const activeTenant = useTenantStore((state) => state.activeTenant);
+
+  return (
+    <div className="app-sidebar-brand">
+      <img
+        src={showFullLogo ? SOLVERMINDS_LOGO_URL : SOLVERMINDS_MARK_URL}
+        alt={activeTenant.name || "Solverminds"}
+        className={
+          showFullLogo
+            ? "app-sidebar-brand__logo app-sidebar-brand__logo--solverminds"
+            : "app-sidebar-brand__logo app-sidebar-brand__logo--mark"
+        }
+      />
+    </div>
+  );
+}
+
+function navIcon(Icon: LucideIcon, size = 18, locked = false) {
+  return <AppIcon icon={Icon} size={size} variant={locked ? "navLocked" : "nav"} />;
+}
+
+/** Label + tooltip title for expanded vs icon-rail collapsed menu. */
+function sidebarMenuLabel(text: string, locked: boolean, lockedLabel: string) {
+  return {
+    title: locked ? lockedLabel : text,
+    label: locked ? <Tooltip title={lockedLabel}>{text}</Tooltip> : text,
+  };
+}
+
+interface SidebarDesktopShellProps {
+  collapsed: boolean;
+  onCollapse: (collapsed: boolean) => void;
+  brandBlock: ReactNode;
+  menuBlock: ReactNode;
+}
+
+function SidebarDesktopShell({
+  collapsed,
+  onCollapse,
+  brandBlock,
+  menuBlock,
+}: SidebarDesktopShellProps) {
+  const { t } = useTranslation("common");
+  const collapseLabel = collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar");
+
+  return (
+    <Sider
+      collapsible
+      collapsed={collapsed}
+      onCollapse={onCollapse}
+      trigger={null}
+      width={SIDEBAR_WIDTH}
+      collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
+      theme="light"
+      className="custom-scroll app-sidebar-sider"
+    >
+      <div className="app-sidebar-shell">
+        {brandBlock}
+        <div className="app-sidebar-shell__menu custom-scroll">{menuBlock}</div>
+        <div className="app-sidebar-shell__footer">
+          <Tooltip title={collapseLabel} placement="right">
+            <button
+              type="button"
+              className="app-sidebar-collapse-trigger"
+              onClick={() => onCollapse(!collapsed)}
+              aria-label={collapseLabel}
+              aria-expanded={!collapsed}
+            >
+              <AppIcon icon={collapsed ? Icons.panelLeftOpen : Icons.panelLeftClose} size={18} />
+              {!collapsed ? <span className="app-sidebar-collapse-trigger__label"></span> : null}
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+    </Sider>
+  );
+}
+
+interface AuthenticatedSidebarProps {
+  collapsed: boolean;
+  onCollapse: (collapsed: boolean) => void;
+  isMobile?: boolean;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+  /** Guest browsing public search modules — lock privileged items. */
+  isGuest?: boolean;
+  onLoginRequired?: (intendedPath?: string | null) => void;
+}
+
+export function AuthenticatedSidebar({
+  collapsed,
+  onCollapse,
+  isMobile = false,
+  mobileOpen = false,
+  onMobileClose,
+  isGuest = false,
+  onLoginRequired,
+}: AuthenticatedSidebarProps) {
+  const { t } = useTranslation("common");
+  const { can, isAdmin, isVendor, isSuperuser } = usePermission();
+  const user = useAuthStore((state) => state.user);
+  const activeTenant = useTenantStore((state) => state.activeTenant);
+  const { data: menuCategories } = useMenuCategories();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const selectedKey = appPathnameToMenuKey(location.pathname);
+  const requiredOpenKeys = menuKeyToOpenGroupKeys(selectedKey);
+  const [userOpenKeys, setUserOpenKeys] = useState<string[]>([]);
+  const openKeys = Array.from(new Set([...requiredOpenKeys, ...userOpenKeys]));
+
+  const isSuperUser = isSuperuser();
+  const isAdminUser = isAdmin();
+  const isVendorUser = isVendor();
+  // Cpanel system admin (legacy SESSION_LOGIN_TYPE=V + usertype A) —
+  // modules listed in vendorMenuList as the primary sidebar.
+  const isCpanelAdmin = user?.adminUserType === "A" && user?.loginType === "V";
+  const tenantModules = [
+    ...(activeTenant.features.allowedModules || []),
+    "admin",
+    "user-creation",
+    "vendor-approvals",
+    "tracking",
+  ];
+
+  const lock = (key: string) => isGuest && !isPublicMenuKey(key, menuCategories);
+  const lockedLabel = t("nav.signInRequired");
+
+  // Cpanel system admin: the Control Panel is their single module; its sections are the
+  // in-page tabs of /app/admin, so the sidebar shows one entry.
+  if (isCpanelAdmin && !isGuest) {
+    const selectedAdminKey = "admin";
+    const cpanelMenuItems: MenuProps["items"] = [
+      {
+        key: "admin",
+        icon: navIcon(NavIcons.admin, 20),
+        title: t("nav.controlPanelAdmin"),
+        label: t("nav.controlPanelAdmin"),
+      },
+    ];
+
+    const onCpanelMenuSelect: MenuProps["onSelect"] = () => {
+      onMobileClose?.();
+      navigate({
+        to: "/app/admin",
+        search: resolveAdminLandingSearch(),
+      } as never);
+    };
+
+    const brandBlock = <SidebarBrandBlock collapsed={collapsed} isMobile={isMobile} />;
+
+    const isIconRail = collapsed && !isMobile;
+    const menuBlock = (
+      <Menu
+        theme="light"
+        mode="inline"
+        inlineCollapsed={isIconRail}
+        selectedKeys={[selectedAdminKey]}
+        {...(isIconRail
+          ? {}
+          : {
+              openKeys,
+              onOpenChange: (keys: string[]) => {
+                setUserOpenKeys(keys);
+              },
+            })}
+        items={cpanelMenuItems}
+        onSelect={onCpanelMenuSelect}
+        className="app-sidebar-menu"
+        classNames={{ popup: { root: "app-sidebar-menu-popup" } }}
+      />
+    );
+
+    if (isMobile) {
+      return (
+        <Drawer
+          title={activeTenant.name}
+          placement="left"
+          open={mobileOpen}
+          onClose={onMobileClose}
+          size={280}
+          classNames={{ body: "app-sidebar-drawer-body custom-scroll" }}
+        >
+          {brandBlock}
+          {menuBlock}
+        </Drawer>
+      );
+    }
+
+    return (
+      <SidebarDesktopShell
+        collapsed={collapsed}
+        onCollapse={onCollapse}
+        brandBlock={brandBlock}
+        menuBlock={menuBlock}
+      />
+    );
+  }
+
+  const rawMenuItems: MenuProps["items"] = [
+    {
+      key: "dashboard",
+      icon: navIcon(NavIcons.dashboard, 20, lock("dashboard")),
+      ...sidebarMenuLabel(t("nav.dashboard"), lock("dashboard"), lockedLabel),
+      className: lock("dashboard") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "schedules-group",
+      icon: navIcon(NavIcons.schedules),
+      title: t("nav.schedules"),
+      label: t("nav.schedules"),
+      children: [
+        {
+          key: "schedules",
+          icon: navIcon(NavIcons.schedules, 20),
+          ...sidebarMenuLabel(t("nav.schedules"), false, lockedLabel),
+          disabled: !isGuest && !can("SCH"),
+        },
+        {
+          key: "tracking",
+          icon: navIcon(NavIcons.tracking, 20),
+          ...sidebarMenuLabel(t("nav.tracking"), false, lockedLabel),
+          disabled: !isGuest && !can("TRK"),
+        },
+      ].filter((child) => isGuest || isSuperUser || tenantModules.includes(child.key)),
+    },
+    {
+      key: "rates",
+      icon: navIcon(NavIcons.rates, 20, lock("rates")),
+      ...sidebarMenuLabel(t("nav.rates"), lock("rates"), lockedLabel),
+      disabled: !isGuest && !can("SCH"),
+      className: lock("rates") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "booking",
+      icon: navIcon(NavIcons.booking, 20, lock("booking")),
+      ...sidebarMenuLabel(t("nav.booking"), lock("booking"), lockedLabel),
+      disabled: !isGuest && !can("BKG"),
+      className: lock("booking") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "si",
+      icon: navIcon(NavIcons.shippingInstruction, 20, lock("si")),
+      ...sidebarMenuLabel(t("nav.shippingInstruction"), lock("si"), lockedLabel),
+      disabled: !isGuest && !can("SI"),
+      className: lock("si") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "vgm",
+      icon: navIcon(NavIcons.vgm, 20, lock("vgm")),
+      ...sidebarMenuLabel(t("nav.vgm"), lock("vgm"), lockedLabel),
+      disabled: !isGuest && !can("VGM"),
+      className: lock("vgm") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "bl",
+      icon: navIcon(NavIcons.billOfLading, 20, lock("bl")),
+      ...sidebarMenuLabel(t("nav.billOfLading"), lock("bl"), lockedLabel),
+      disabled: !isGuest && !can("BL"),
+      className: lock("bl") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "do",
+      icon: navIcon(NavIcons.deliveryOrder, 20, lock("do")),
+      ...sidebarMenuLabel(t("nav.deliveryOrder"), lock("do"), lockedLabel),
+      className: lock("do") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "arrival-notice",
+      icon: navIcon(NavIcons.arrivalNotice, 20, lock("arrival-notice")),
+      ...sidebarMenuLabel(t("nav.arrivalNotice"), lock("arrival-notice"), lockedLabel),
+      className: lock("arrival-notice") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "cro",
+      icon: navIcon(NavIcons.containerRelease, 20, lock("cro")),
+      ...sidebarMenuLabel(t("nav.containerReleaseOrder"), lock("cro"), lockedLabel),
+      disabled: !isGuest && !can("CRO"),
+      className: lock("cro") ? "ant-menu-item-locked" : undefined,
+    },
+    {
+      key: "customer-stmt",
+      icon: navIcon(NavIcons.customerStatement, 20, lock("customer-stmt")),
+      ...sidebarMenuLabel(t("nav.customerStatement"), lock("customer-stmt"), lockedLabel),
+      disabled: !isGuest && !can("STMT"),
+      className: lock("customer-stmt") ? "ant-menu-item-locked" : undefined,
+    },
+
+    {
+      key: "more-group",
+      icon: navIcon(NavIcons.more, 20),
+      title: t("nav.more"),
+      label: t("nav.more"),
+      children: [
+        isAdminUser
+          ? {
+              key: "admin",
+              icon: navIcon(NavIcons.admin, 20, lock("admin")),
+              ...sidebarMenuLabel(t("nav.controlPanelAdmin"), lock("admin"), lockedLabel),
+              className: lock("admin") ? "ant-menu-item-locked" : undefined,
+            }
+          : null,
+        {
+          key: "payments",
+          icon: navIcon(NavIcons.payments, 20, lock("payments")),
+          ...sidebarMenuLabel(t("nav.paymentHistory"), lock("payments"), lockedLabel),
+          disabled: !isGuest && !can("PAY"),
+          className: lock("payments") ? "ant-menu-item-locked" : undefined,
+        },
+        {
+          key: "carbon",
+          icon: navIcon(NavIcons.carbon, 20, lock("carbon")),
+          ...sidebarMenuLabel(t("nav.carbonCalculator"), lock("carbon"), lockedLabel),
+          disabled: !isGuest && !can("CO2"),
+          className: lock("carbon") ? "ant-menu-item-locked" : undefined,
+        },
+        isSuperUser
+          ? {
+              key: "user-creation",
+              icon: navIcon(NavIcons.userCreation, 20, lock("user-creation")),
+              ...sidebarMenuLabel(t("nav.userCreation"), lock("user-creation"), lockedLabel),
+              className: lock("user-creation") ? "ant-menu-item-locked" : undefined,
+            }
+          : null,
+        isVendorUser
+          ? {
+              key: "vendor-approvals",
+              icon: navIcon(NavAgencyApprovalIcon, 20, lock("vendor-approvals")),
+              ...sidebarMenuLabel(t("nav.agencyApprovals"), lock("vendor-approvals"), lockedLabel),
+              className: lock("vendor-approvals") ? "ant-menu-item-locked" : undefined,
+            }
+          : null,
+      ]
+        .filter(Boolean)
+        .filter(
+          (child) => isGuest || isSuperUser || tenantModules.includes(child!.key),
+        ) as NonNullable<MenuProps["items"]>,
+    },
+  ];
+
+  const menuItems = rawMenuItems.filter((item) => {
+    if (!item) return false;
+    if (isGuest || isSuperUser) return true;
+    const key = item.key as string;
+    if (key.endsWith("-group")) {
+      const groupItem = item as { children?: unknown[] };
+      return Array.isArray(groupItem.children) && groupItem.children.length > 0;
+    }
+    return tenantModules.includes(key);
+  });
+
+  const onMenuSelect: MenuProps["onSelect"] = ({ key }) => {
+    onMobileClose?.();
+
+    if (isGuest && !isPublicMenuKey(key, menuCategories)) {
+      onLoginRequired?.(menuKeyToAppPath(key));
+      return;
+    }
+
+    if (key === "rates" || key === "tariff") {
+      navigate({ to: "/app/rates" });
+    } else if (key === "si") {
+      navigate({ to: "/app/shipping-instruction" });
+    } else if (key === "do") {
+      navigate({ to: "/app/delivery-order" });
+    } else {
+      if (key === "admin") {
+        navigate({
+          to: "/app/admin",
+          search: resolveAdminLandingSearch(),
+        } as never);
+        return;
+      }
+      navigate({ to: `/app/${key}` });
+    }
+  };
+
+  const brandBlock = <SidebarBrandBlock collapsed={collapsed} isMobile={isMobile} />;
+
+  /** Icon-rail (collapsed): leave openKeys uncontrolled so AntD popup submenus work.
+   *  Expanded: keep parent groups open for the active module. */
+  const isIconRail = collapsed && !isMobile;
+  const menuBlock = (
+    <Menu
+      theme="light"
+      mode="inline"
+      inlineCollapsed={isIconRail}
+      selectedKeys={[selectedKey]}
+      {...(isIconRail
+        ? {}
+        : {
+            openKeys,
+            onOpenChange: (keys: string[]) => {
+              setUserOpenKeys(keys);
+            },
+          })}
+      items={menuItems}
+      onSelect={onMenuSelect}
+      className="app-sidebar-menu"
+      // Collapsed "More" flyout renders in a portal — keep icon contrast there too
+      classNames={{ popup: { root: "app-sidebar-menu-popup" } }}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        title={activeTenant.name}
+        placement="left"
+        open={mobileOpen}
+        onClose={onMobileClose}
+        size={280}
+        classNames={{ body: "app-sidebar-drawer-body custom-scroll" }}
+      >
+        {brandBlock}
+        {menuBlock}
+      </Drawer>
+    );
+  }
+
+  return (
+    <SidebarDesktopShell
+      collapsed={collapsed}
+      onCollapse={onCollapse}
+      brandBlock={brandBlock}
+      menuBlock={menuBlock}
+    />
+  );
+}

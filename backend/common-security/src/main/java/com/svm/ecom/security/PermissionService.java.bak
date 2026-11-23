@@ -1,0 +1,149 @@
+package com.svm.ecom.security;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service for handling user permission checks in a centralized manner.
+ * This service provides methods to check endpoint access and Swagger visibility.
+ * Now uses database-driven permissions instead of properties file.
+ */
+@Service
+public class PermissionService {
+
+    @Autowired
+    private DatabasePermissionService databasePermissionService;
+
+    /**
+     * Check if the current authenticated user has permission to access an endpoint
+     */
+    public boolean hasEndpointPermission(String endpoint) {
+        return databasePermissionService.hasEndpointPermission(endpoint);
+    }
+
+    /**
+     * Check if a specific user has permission to access an endpoint
+     */
+    public boolean hasEndpointPermission(String username, String endpoint) {
+        return databasePermissionService.hasEndpointPermission(username, endpoint);
+    }
+
+    /**
+     * Check if the current authenticated user can view a Swagger API group
+     */
+    public boolean canViewSwaggerGroup(String apiGroup) {
+        return databasePermissionService.canViewSwaggerGroup(apiGroup);
+    }
+
+    /**
+     * Check if a specific user can view a Swagger API group
+     */
+    public boolean canViewSwaggerGroup(String username, String apiGroup) {
+        return databasePermissionService.canViewSwaggerGroup(username, apiGroup);
+    }
+
+    /**
+     * Get the current authenticated username
+     */
+    public String getCurrentUsername() {
+        return databasePermissionService.getCurrentUsername();
+    }
+
+    /**
+     * Check if tracking endpoints are accessible to the current user
+     */
+    public boolean canAccessTracking() {
+        return databasePermissionService.canAccessTracking();
+    }
+
+    /**
+     * Check if tracking endpoints are accessible to a specific user
+     */
+    public boolean canAccessTracking(String username) {
+        return databasePermissionService.canAccessTracking(username);
+    }
+
+    /**
+     * Check if schedule endpoints are accessible to the current user
+     */
+    public boolean canAccessSchedule() {
+        return databasePermissionService.canAccessSchedule();
+    }
+
+    /**
+     * Check if schedule endpoints are accessible to a specific user
+     */
+    public boolean canAccessSchedule(String username) {
+        return databasePermissionService.canAccessSchedule(username);
+    }
+
+    /**
+     * Check if master endpoints are accessible to the current user
+     */
+    public boolean canAccessMaster() {
+        return databasePermissionService.canAccessMaster();
+    }
+
+    /**
+     * Check if master endpoints are accessible to a specific user
+     */
+    public boolean canAccessMaster(String username) {
+        return databasePermissionService.canAccessMaster(username);
+    }
+
+    /**
+     * Get user endpoint permissions for debugging
+     */
+    public java.util.Set<String> getUserEndpointPermissions(String username) {
+        return databasePermissionService.getUserEndpointPermissions(username);
+    }
+
+    /**
+     * Get user swagger group permissions for debugging
+     */
+    public java.util.Set<String> getUserSwaggerGroupPermissions(String username) {
+        return databasePermissionService.getUserSwaggerGroupPermissions(username);
+    }
+
+    /**
+     * Check if vessel endpoints are accessible to the current user
+     */
+    public boolean canAccessVessel() {
+        return hasEndpointPermission("vessel");
+    }
+
+    /**
+     * Check if vessel endpoints are accessible to a specific user
+     */
+    public boolean canAccessVessel(String username) {
+        return hasEndpointPermission(username, "vessel");
+    }
+
+    /**
+     * Check if port endpoints are accessible to the current user
+     */
+    public boolean canAccessPort() {
+        return hasEndpointPermission("port");
+    }
+
+    /**
+     * Check if port endpoints are accessible to a specific user
+     */
+    public boolean canAccessPort(String username) {
+        return hasEndpointPermission(username, "port");
+    }
+
+    /**
+     * Check if arrival notice endpoints are accessible to the current user
+     */
+    public boolean canAccessArrivalNotice() {
+        return hasEndpointPermission("arrival-notice");
+    }
+
+    /**
+     * Check if arrival notice endpoints are accessible to a specific user
+     */
+    public boolean canAccessArrivalNotice(String username) {
+        return hasEndpointPermission(username, "arrival-notice");
+    }
+}

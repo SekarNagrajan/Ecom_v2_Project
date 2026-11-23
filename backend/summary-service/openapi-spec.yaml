@@ -1,0 +1,332 @@
+openapi: 3.0.3
+info:
+  title: Summary Service API
+  description: API for retrieving dashboard summary data
+  version: 1.0.0
+  contact:
+    name: SVM Team
+    email: support@solverminds.com
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+  - url: https://api.example.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/summary/dashboard:
+    get:
+      summary: Get Dashboard Summary
+      description: Retrieves dashboard summary data from stored procedure usp_getdashboardecomboookingsummary
+      operationId: getDashboardSummary
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Successful response with dashboard summary data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+              example:
+                data:
+                  - onlineBookNo: "BKON5300"
+                    originPortId: "HKHKG"
+                    finalPortId: "OMSOH"
+                    originPortDesc: "HONG KONG JAWAHAR"
+                    finalPortDesc: "HNGHHKG"
+                    agencyId: "00:00.0"
+                    departureDate: "HKHKG"
+                    loadPortId: "OMSOH"
+                    DischargePortId: "37:04.2"
+                    bookDate: "ESLHNGHNG"
+                    bookingNumber: null
+                    status: null
+                    blNumber: "DV20TNB1"
+                    containerno: null
+                    latestActivityCode: null
+                    tuesCount: 1
+                  - onlineBookNo: "BKON5305"
+                    originPortId: "HKHKG"
+                    finalPortId: "OMSOH"
+                    originPortDesc: "HONG KONG JAWAHAR"
+                    finalPortDesc: "CHNSCN"
+                    agencyId: "00:00.0"
+                    departureDate: "HKHKG"
+                    loadPortId: "OMSOH"
+                    DischargePortId: "53:58.2"
+                    bookDate: "SVMNSC21"
+                    bookingNumber: null
+                    status: null
+                    blNumber: "20DCTNB1"
+                    containerno: null
+                    latestActivityCode: null
+                    tuesCount: 1
+                timestamp: "2024-01-15T10:30:00.000Z"
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                httpMethod: "GET"
+                requestUri: "/api/summary/dashboard"
+                statusCode: 401
+                statusCodeText: "Unauthorized"
+                errorMessage: "Authentication required"
+                errorDateTime: "2025-01-22T10:30:00Z"
+                errors:
+                  - errorCode: 1401
+                    field: null
+                    value: null
+                    reason: "unauthorized"
+                    message: "Full authentication is required to access this resource"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                httpMethod: "GET"
+                requestUri: "/api/summary/dashboard"
+                statusCode: 500
+                statusCodeText: "Internal Server Error"
+                errorMessage: "The supplied data could not be accepted"
+                errorDateTime: "2025-01-22T10:30:00Z"
+                errors:
+                  - errorCode: 1500
+                    field: null
+                    value: null
+                    reason: "internalError"
+                    message: "An unexpected error occurred. Please try again later."
+        '503':
+          description: Service unavailable - Report database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                httpMethod: "GET"
+                requestUri: "/api/summary/dashboard"
+                statusCode: 503
+                statusCodeText: "Service Unavailable"
+                errorMessage: "Service is temporarily unavailable"
+                errorDateTime: "2025-01-22T10:30:00Z"
+                errors:
+                  - errorCode: 1503
+                    field: null
+                    value: null
+                    reason: "serviceUnavailable"
+                    message: "Report database is unavailable. Please try again later."
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from authentication service
+
+  schemas:
+    DashboardResponse:
+      type: object
+      required:
+        - data
+        - timestamp
+      properties:
+        data:
+          type: array
+          description: Array of dashboard summary records
+          items:
+            $ref: '#/components/schemas/DashboardSummary'
+        timestamp:
+          type: string
+          format: date-time
+          description: Response generation timestamp
+          example: "2024-01-15T10:30:00.000Z"
+
+    DashboardSummary:
+      type: object
+      description: Individual dashboard summary record from the stored procedure
+      properties:
+        onlineBookNo:
+          type: string
+          nullable: true
+          description: Online book number
+          example: "BKON5300"
+        originPortId:
+          type: string
+          nullable: true
+          description: Origin port ID
+          example: "HKHKG"
+        finalPortId:
+          type: string
+          nullable: true
+          description: Final port ID
+          example: "OMSOH"
+        originPortDesc:
+          type: string
+          nullable: true
+          description: Origin port description
+          example: "HONG KONG JAWAHAR"
+        finalPortDesc:
+          type: string
+          nullable: true
+          description: Final port description
+          example: "HNGHHKG"
+        agencyId:
+          type: string
+          nullable: true
+          description: Agency ID
+          example: "00:00.0"
+        departureDate:
+          type: string
+          nullable: true
+          description: Departure date
+          example: "HKHKG"
+        loadPortId:
+          type: string
+          nullable: true
+          description: Load port ID
+          example: "OMSOH"
+        DischargePortId:
+          type: string
+          nullable: true
+          description: Discharge port ID
+          example: "37:04.2"
+        bookDate:
+          type: string
+          nullable: true
+          description: Book date
+          example: "ESLHNGHNG"
+        bookingNumber:
+          type: string
+          nullable: true
+          description: Book number
+          example: null
+        status:
+          $ref: '#/components/schemas/BLStatus'
+        blNumber:
+          type: string
+          nullable: true
+          description: Bill of lading number
+          example: "DV20TNB1"
+        containerno:
+          type: string
+          nullable: true
+          description: Container number
+          example: null
+        latestActivityCode:
+          type: string
+          nullable: true
+          description: Latest activity code
+          example: null
+        tuesCount:
+          type: integer
+          nullable: true
+          description: Tuesday count
+          example: 1
+
+    ErrorResponse:
+      type: object
+      required:
+        - httpMethod
+        - requestUri
+        - statusCode
+        - statusCodeText
+        - errorMessage
+        - errorDateTime
+        - errors
+      properties:
+        httpMethod:
+          type: string
+          description: HTTP method of the request
+          example: "POST"
+        requestUri:
+          type: string
+          description: URI of the request that caused the error
+          example: "/api/v1/bookings"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        statusCodeText:
+          type: string
+          description: HTTP status code text
+          example: "Bad Request"
+        errorMessage:
+          type: string
+          description: Summary error message
+          example: "Validation failed"
+        errorDateTime:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred (UTC, RFC 3339 format with Z suffix)
+          example: "2025-01-22T10:30:00Z"
+        errors:
+          type: array
+          description: Array of detailed error information
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorDetail:
+      type: object
+      required:
+        - errorCode
+        - reason
+        - message
+      properties:
+        errorCode:
+          type: integer
+          description: Implementation-specific error code
+          example: 1001
+        field:
+          type: string
+          nullable: true
+          description: Name of the field that caused the error
+          example: "facilityCode"
+        value:
+          type: string
+          nullable: true
+          description: Value that caused the error
+          example: "SG SIN WHS"
+        reason:
+          type: string
+          description: Machine-friendly error classification
+          enum: ["validationError", "badRequest", "unauthorized", "forbidden", "businessRule", "internalError", "methodNotAllowed", "unsupportedMediaType", "serviceUnavailable"]
+          example: "validationError"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Spaces not allowed in facility code"
+
+    BLStatus:
+      type: string
+      description: "BL Status: D – Draft, C – Confirmed, I – Issued, V – Cancelled"
+      nullable: true
+      enum:
+        - D
+        - C
+        - I
+        - V
+      example: "D"
+
+    Bound:
+      type: string
+      description: "Bound direction: W – West, E – East, N – North, S – South"
+      nullable: true
+      enum:
+        - W
+        - E
+        - N
+        - S
+      example: "W"
+
+tags:
+  - name: Dashboard
+    description: Dashboard-related endpoints

@@ -1,0 +1,446 @@
+package com.svm.ecom.security;
+
+import com.svm.ecom.domain.user.UserPermission;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.responses.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Controller for managing user permissions through REST API.
+ * Only accessible to admin users for security.
+ */
+@RestController
+@RequestMapping("/api/v1/admin/permissions")
+@Tag(name = "Permission Management API", description = "Administrative endpoints for managing user permissions and access control. Requires JWT authentication.")
+public class PermissionManagementController {
+
+    @Autowired
+    private DatabasePermissionService databasePermissionService;
+
+    @GetMapping("/users/{username}")
+    @Operation(
+        summary = "Get User Permissions", 
+        description = "Retrieve all permissions (endpoint and swagger group) for a specific user"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "User permissions retrieved successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"username\":\"john.doe\",\"endpointPermissions\":[\"schedule\",\"tracking\"],\"swaggerGroupPermissions\":[\"schedule-api\",\"tracking-api\"]}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while retrieving permissions.\"}")))
+    })
+    public ResponseEntity<Map<String, Object>> getUserPermissions(
+            @Parameter(description = "Username to get permissions for", required = true, example = "john.doe")
+            @PathVariable String username) {
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", username);
+        response.put("endpointPermissions", databasePermissionService.getUserEndpointPermissions(username));
+        response.put("swaggerGroupPermissions", databasePermissionService.getUserSwaggerGroupPermissions(username));
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/users/{username}/endpoints")
+    @Operation(
+        summary = "Add Endpoint Permission", 
+        description = "Grant a user permission to access a specific API endpoint"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Endpoint permission added successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"Endpoint permission added successfully\",\"username\":\"john.doe\",\"endpoint\":\"tracking\"}"))),
+        @ApiResponse(responseCode = "400", description = "Bad Request",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = BadRequestErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "badRequest",
+                                         summary = "Invalid request parameters",
+                                         value = "{\"error\":\"Bad Request\",\"message\":\"Invalid endpoint permission. Valid values are: schedule, tracking, vessel, port, *\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while adding permission.\"}")))
+    })
+    public ResponseEntity<Map<String, String>> addEndpointPermission(
+            @Parameter(description = "Username to add permission for", required = true, example = "john.doe")
+            @PathVariable String username,
+            @Parameter(description = "Endpoint permission to add (schedule, tracking, vessel, port, *)", required = true, example = "tracking")
+            @RequestParam String endpoint,
+            @Parameter(description = "Optional description for the permission", required = false, example = "Access to container tracking functionality")
+            @RequestParam(required = false) String description) {
+        
+        try {
+            databasePermissionService.addPermission(username, UserPermission.PermissionType.ENDPOINT, endpoint, description);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Endpoint permission added successfully");
+            response.put("username", username);
+            response.put("endpoint", endpoint);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/users/{username}/swagger-groups")
+    @Operation(
+        summary = "Add Swagger Group Permission", 
+        description = "Grant a user permission to view a specific API group in Swagger UI"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Swagger group permission added successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"Swagger group permission added successfully\",\"username\":\"john.doe\",\"swaggerGroup\":\"tracking-api\"}"))),
+        @ApiResponse(responseCode = "400", description = "Bad Request",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = BadRequestErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "badRequest",
+                                         summary = "Invalid request parameters",
+                                         value = "{\"error\":\"Bad Request\",\"message\":\"Invalid swagger group permission. Valid values are: schedule-api, tracking-api, ecom-api, *\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while adding swagger permission.\"}")))
+    })
+    public ResponseEntity<Map<String, String>> addSwaggerGroupPermission(
+            @Parameter(description = "Username to add permission for", required = true, example = "john.doe")
+            @PathVariable String username,
+            @Parameter(description = "Swagger group permission to add (schedule-api, tracking-api, ecom-api, *)", required = true, example = "tracking-api")
+            @RequestParam String swaggerGroup,
+            @Parameter(description = "Optional description for the permission", required = false, example = "Access to view tracking API documentation")
+            @RequestParam(required = false) String description) {
+        
+        try {
+            databasePermissionService.addPermission(username, UserPermission.PermissionType.SWAGGER_GROUP, swaggerGroup, description);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Swagger group permission added successfully");
+            response.put("username", username);
+            response.put("swaggerGroup", swaggerGroup);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @DeleteMapping("/users/{username}/endpoints/{endpoint}")
+    @Operation(
+        summary = "Remove Endpoint Permission", 
+        description = "Revoke a user's permission to access a specific API endpoint"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Endpoint permission removed successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"Endpoint permission removed successfully\",\"username\":\"john.doe\",\"endpoint\":\"tracking\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while removing permission.\"})")))
+    })
+    public ResponseEntity<Map<String, String>> removeEndpointPermission(
+            @Parameter(description = "Username to remove permission from", required = true, example = "john.doe")
+            @PathVariable String username,
+            @Parameter(description = "Endpoint permission to remove", required = true, example = "tracking")
+            @PathVariable String endpoint) {
+        
+        databasePermissionService.removePermission(username, UserPermission.PermissionType.ENDPOINT, endpoint);
+        
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Endpoint permission removed successfully");
+        response.put("username", username);
+        response.put("endpoint", endpoint);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/users/{username}/swagger-groups/{swaggerGroup}")
+    @Operation(
+        summary = "Remove Swagger Group Permission", 
+        description = "Revoke a user's permission to view a specific API group in Swagger UI"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Swagger group permission removed successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"Swagger group permission removed successfully\",\"username\":\"john.doe\",\"swaggerGroup\":\"tracking-api\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while removing swagger permission.\"})")))
+    })
+    public ResponseEntity<Map<String, String>> removeSwaggerGroupPermission(
+            @Parameter(description = "Username to remove permission from", required = true, example = "john.doe")
+            @PathVariable String username,
+            @Parameter(description = "Swagger group permission to remove", required = true, example = "tracking-api")
+            @PathVariable String swaggerGroup) {
+        
+        databasePermissionService.removePermission(username, UserPermission.PermissionType.SWAGGER_GROUP, swaggerGroup);
+        
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Swagger group permission removed successfully");
+        response.put("username", username);
+        response.put("swaggerGroup", swaggerGroup);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/users/{username}")
+    @Operation(
+        summary = "Set User Permissions", 
+        description = "Replace all permissions for a user with the provided endpoint and swagger group permissions"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "User permissions updated successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"User permissions updated successfully\",\"username\":\"john.doe\"}"))),
+        @ApiResponse(responseCode = "400", description = "Bad Request",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = BadRequestErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "badRequest",
+                                         summary = "Invalid request parameters",
+                                         value = "{\"error\":\"Bad Request\",\"message\":\"Invalid permission values in request body.\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while updating permissions.\"})")))
+    })
+    public ResponseEntity<Map<String, String>> setUserPermissions(
+            @Parameter(description = "Username to set permissions for", required = true, example = "john.doe")
+            @PathVariable String username,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "User permissions to set", 
+                required = true,
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = "{\"endpointPermissions\":[\"schedule\",\"tracking\"],\"swaggerGroupPermissions\":[\"schedule-api\",\"tracking-api\"]}")
+                )
+            )
+            @RequestBody UserPermissionsRequest request) {
+        
+        try {
+            databasePermissionService.setUserPermissions(username, request.getEndpointPermissions(), request.getSwaggerGroupPermissions());
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "User permissions updated successfully");
+            response.put("username", username);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/users")
+    @Operation(
+        summary = "Get All Users With Permissions", 
+        description = "Retrieve a list of all users and their assigned permissions"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Users and permissions retrieved successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"users\":[{\"username\":\"john.doe\",\"endpointPermissions\":[\"schedule\"],\"swaggerGroupPermissions\":[\"schedule-api\"]},{\"username\":\"jane.smith\",\"endpointPermissions\":[\"tracking\"],\"swaggerGroupPermissions\":[\"tracking-api\"]}]}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while retrieving users.\"})")))
+    })
+    public ResponseEntity<Map<String, Object>> getAllUsersWithPermissions() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("users", databasePermissionService.getAllUsersWithPermissions());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/cache/clear")
+    @Operation(
+        summary = "Clear Permission Caches", 
+        description = "Clear all permission caches to force fresh data retrieval from database"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Permission caches cleared successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"message\":\"Permission caches cleared successfully\"}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while clearing caches.\"})")))
+    })
+    public ResponseEntity<Map<String, String>> clearCaches() {
+        databasePermissionService.clearPermissionCaches();
+        
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Permission caches cleared successfully");
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/constants")
+    @Operation(
+        summary = "Get Permission Constants", 
+        description = "Retrieve all available permission types and their descriptions for reference"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Permission constants retrieved successfully", 
+                    content = @Content(mediaType = "application/json", 
+                                     examples = @ExampleObject(value = "{\"endpointPermissions\":{\"schedule\":\"Access to schedule API endpoints\",\"tracking\":\"Access to tracking API endpoints\",\"vessel\":\"Access to vessel API endpoints\",\"port\":\"Access to port API endpoints\",\"*\":\"Access to all API endpoints\"},\"swaggerGroupPermissions\":{\"schedule-api\":\"View schedule API in Swagger\",\"tracking-api\":\"View tracking API in Swagger\",\"ecom-api\":\"View combined API in Swagger\",\"*\":\"View all API groups in Swagger\"}}"))),
+        @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ForbiddenErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "forbidden",
+                                         summary = "Access denied",
+                                         value = "{\"error\":\"Forbidden\",\"message\":\"Access denied. Admin role required.\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                    content = @Content(mediaType = "application/json", 
+                                     schema = @Schema(implementation = ServerErrorResponse.class),
+                                     examples = @ExampleObject(
+                                         name = "serverError",
+                                         summary = "Internal server error",
+                                         value = "{\"error\":\"Internal Server Error\",\"message\":\"An unexpected error occurred while retrieving constants.\"})")))
+    })
+    public ResponseEntity<Map<String, Object>> getPermissionConstants() {
+        Map<String, Object> response = new HashMap<>();
+        
+        Map<String, String> endpointPermissions = new HashMap<>();
+        endpointPermissions.put("schedule", "Access to schedule API endpoints");
+        endpointPermissions.put("tracking", "Access to tracking API endpoints");
+        endpointPermissions.put("vessel", "Access to vessel API endpoints");
+        endpointPermissions.put("port", "Access to port API endpoints");
+        endpointPermissions.put("*", "Access to all API endpoints");
+        
+        Map<String, String> swaggerGroupPermissions = new HashMap<>();
+        swaggerGroupPermissions.put("schedule-api", "View schedule API in Swagger");
+        swaggerGroupPermissions.put("tracking-api", "View tracking API in Swagger");
+        swaggerGroupPermissions.put("ecom-api", "View combined API in Swagger");
+        swaggerGroupPermissions.put("*", "View all API groups in Swagger");
+        
+        response.put("endpointPermissions", endpointPermissions);
+        response.put("swaggerGroupPermissions", swaggerGroupPermissions);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Request DTO for setting user permissions
+     */
+    public static class UserPermissionsRequest {
+        private List<String> endpointPermissions;
+        private List<String> swaggerGroupPermissions;
+
+        public List<String> getEndpointPermissions() {
+            return endpointPermissions;
+        }
+
+        public void setEndpointPermissions(List<String> endpointPermissions) {
+            this.endpointPermissions = endpointPermissions;
+        }
+
+        public List<String> getSwaggerGroupPermissions() {
+            return swaggerGroupPermissions;
+        }
+
+        public void setSwaggerGroupPermissions(List<String> swaggerGroupPermissions) {
+            this.swaggerGroupPermissions = swaggerGroupPermissions;
+        }
+    }
+}

@@ -1,0 +1,90 @@
+// Created by Sekar Nagarajan (2026-08-28 11:50)
+import { AppButton } from "@solverminds/shared-ui";
+import { useToast } from "@solverminds/shared-ui/hooks";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { Card, Result, Space, Typography } from "antd";
+import { useTranslation } from "react-i18next";
+
+import { AppIcon, Icons, NavBillOfLadingIcon } from "../../components/icons";
+import { FeaturePageShell } from "../../components/shared/feature-page-shell";
+import { ModuleScreenHeader } from "../../components/shared/module-screen-header";
+import { formatModuleScreenTitle } from "../../constants/module-titles";
+import { useModuleTitles } from "../../i18n/use-module-titles";
+import { sendBLAmendmentMail } from "./api/bl.api";
+import { useBLDetailQuery } from "./api/bl.queries";
+import { BlModuleStyles } from "./components/bl-module-styles";
+
+const { Text, Paragraph } = Typography;
+
+export function BillOfLadingSubmitResultRoute() {
+  const { t } = useTranslation(["bill-of-lading", "common", "modules"]);
+  const MODULE_TITLES = useModuleTitles();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { blNo } = useParams({ strict: false }) as { blNo: string };
+  const { data: detail } = useBLDetailQuery(blNo);
+
+  const submitResult = detail?.submitResult;
+
+  const handleAmendmentMail = async () => {
+    const res = await sendBLAmendmentMail(blNo);
+    if (res.error) {
+      toast.error(res.error.message);
+      return;
+    }
+    toast.success(t("toasts.amendmentSent"));
+  };
+
+  return (
+    <FeaturePageShell>
+      <BlModuleStyles />
+      <Card className="wizard-page-card">
+        <ModuleScreenHeader
+          icon={NavBillOfLadingIcon}
+          title={formatModuleScreenTitle(MODULE_TITLES.billOfLading, blNo)}
+          marginBottom={0}
+        />
+        <Result
+          status={submitResult?.success ? "success" : "warning"}
+          title={t("submitResult.title")}
+          subTitle={
+            <Space direction="vertical" className="bl-submit-result">
+              {(submitResult?.messages ?? [t("submitResult.defaultMessage")]).map((msg) => (
+                <Paragraph key={msg}>{msg}</Paragraph>
+              ))}
+              {submitResult?.insuranceMessage ? (
+                <Text type="secondary">{submitResult.insuranceMessage}</Text>
+              ) : null}
+              {submitResult?.fileRestrictionMessage ? (
+                <Text type="warning">
+                  {submitResult.fileRestrictionMessage}
+                </Text>
+              ) : null}
+            </Space>
+          }
+          extra={
+            <Space wrap>
+              <AppButton
+                type="primary"
+                onClick={() => navigate({ to: `/app/bl/${blNo}` })}
+              >
+                {t("actions.view")}
+              </AppButton>
+              <AppButton onClick={() => navigate({ to: "/app/bl" })}>
+                {t("actions.back")}
+              </AppButton>
+              {detail?.status === "S" ? (
+                <AppButton
+                  icon={<AppIcon icon={Icons.mail} size={16} />}
+                  onClick={handleAmendmentMail}
+                >
+                  {t("actions.sendAmendmentMail")}
+                </AppButton>
+              ) : null}
+            </Space>
+          }
+        />
+      </Card>
+    </FeaturePageShell>
+  );
+}

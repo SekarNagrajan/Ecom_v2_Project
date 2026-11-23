@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  
+  <parent>
+    <groupId>com.svm.ecom</groupId>
+    <artifactId>ecomapi</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  
+  <artifactId>sibl-service</artifactId>
+  <packaging>jar</packaging>
+  <name>SIBL Service Module</name>
+
+  <dependencies>
+    <!-- ECOM Common Enums -->
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>ecom-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Web + Actuator -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- JDBC + JPA + SQL Server -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.sqlserver</groupId>
+      <artifactId>mssql-jdbc</artifactId>
+      <version>10.2.3.jre8</version>
+    </dependency>
+    <dependency>
+      <groupId>com.zaxxer</groupId>
+      <artifactId>HikariCP</artifactId>
+    </dependency>
+
+    <!-- Security (rely on your common-security for JWT + reportdb fallback beans) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>common-security</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- EDI Common Entities -->
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>edi-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Booking common (booking, booking_leg, booking_cust, booking_cargo, booking_commodity, booking_referen for view-by-bookingNo) -->
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>booking-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- BL common (Bl, BlCargo, BlCommodity, BlCust, BlHeader entities/repos for view-by-blNumber) -->
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>bl-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Optional: Lombok -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- OpenAPI 3.0 Documentation -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-ui</artifactId>
+      <version>1.7.0</version>
+    </dependency>
+    
+    <!-- Swagger Configuration -->
+    <dependency>
+      <groupId>com.svm.ecom</groupId>
+      <artifactId>swagger-config</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Tests -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.junit.vintage</groupId>
+          <artifactId>junit-vintage-engine</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.10.1</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+        </configuration>
+      </plugin>
+              <!-- Keep source application.properties for standalone runs; do not ship it inside the library JAR consumed by api-gateway. -->
+<plugin>
+<groupId>org.apache.maven.plugins</groupId>
+<artifactId>maven-jar-plugin</artifactId>
+<configuration>
+<excludes>
+<exclude>application.properties</exclude>
+<exclude>application*.properties</exclude>
+<exclude>application.yml</exclude>
+<exclude>application*.yml</exclude>
+<exclude>application.yaml</exclude>
+<exclude>application*.yaml</exclude>
+</excludes>
+</configuration>
+</plugin>
+    </plugins>
+  </build>
+</project>

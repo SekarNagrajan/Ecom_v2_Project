@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ECOM API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="/webjars/swagger-ui/swagger-ui.css" />
+    <style>
+        /* Aggressive CSS to hide servers dropdown */
+        .swagger-ui .servers,
+        .swagger-ui .servers-wrapper,
+        .swagger-ui .scheme-container,
+        .swagger-ui .servers-title,
+        .swagger-ui .servers select,
+        .swagger-ui div[class*="servers"],
+        .swagger-ui label[for*="server"],
+        .swagger-ui [data-name*="server"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="/webjars/swagger-ui/swagger-ui-bundle.js"></script>
+    <script src="/webjars/swagger-ui/swagger-ui-standalone-preset.js"></script>
+    <script src="/swagger-ui-no-servers.js"></script>
+    <script>
+        // This will only run if this HTML is loaded directly
+        if (typeof SwaggerUIBundle !== 'undefined') {
+            const ui = SwaggerUIBundle({
+                urls: [
+                    { name: 'ECOM API - Schedule', url: '/v3/api-docs/schedule' },
+                    { name: 'ECOM API - Tracking', url: '/v3/api-docs/tracking' },
+                    { name: 'ECOM API - Master', url: '/v3/api-docs/master' },
+                    { name: 'ECOM API - Authenticate', url: '/v3/api-docs/authenticate' }
+                ],
+                dom_id: '#swagger-ui',
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                layout: 'StandaloneLayout',
+                displayOperationId: true,
+                operationsSorter: 'method',
+                tagsSorter: 'alpha',
+                validatorUrl: null,
+                onComplete: function() {
+                    console.log('Main Swagger UI loaded - removing servers');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+# =====================================================================
+# ECOM API - INTERNAL configuration (packaged inside the WAR)
+# =====================================================================
+# Contains ONLY settings that are identical on every server.
+# NO passwords, NO DB hosts, NO environment-specific values here.
+#
+# Environment-specific values live in the EXTERNAL file:
+#       %CATALINA_BASE%/conf/ecomapi.yml
+#
+# Values in the external file override anything defined below.
+# Templates: ECOMAPI/deploy/external-config/<env>/ecomapi.yml
+# =====================================================================
+
+# Fail-fast if the external file is missing (no "optional:" prefix).
+# Override path with -Decomapi.config.path=<absolute file path>
+spring:
+  config:
+    import: "file:${ecomapi.config.path:${catalina.base:.}/conf/ecomapi.yml}"
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  datasource:
+    continue-on-error: true
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+      file-size-threshold: 2MB
+      resolve-lazily: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /ecomapi-service
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+    mime-types: "text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json"
+    min-response-size: 1024
+  error:
+    include-message: on_param
+    include-binding-errors: on_param
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui
+    disable-swagger-default-url: true
+    display-operation-id: true
+    operations-sorter: method
+    tags-sorter: alpha
+    csrf:
+      enabled: false
+    # Literal two-quote characters — matches application.properties value "" (not empty string)
+    oauth-additional-query-string-params: '""'
+    urls:
+      - name: ECOM API - Schedule
+        url: /v3/api-docs/schedule
+      - name: ECOM API - Tracking
+        url: /v3/api-docs/tracking
+      - name: ECOM API - Master
+        url: /v3/api-docs/master
+      - name: ECOM API - Authenticate
+        url: /v3/api-docs/authenticate
+      - name: ECOM API - Master (V2)
+        url: /v3/api-docs/master-v2
+  cache:
+    disabled: true
+  show-actuator: false
+  auto-tag-classes: true
+  remove-broken-reference-definitions: false
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+
+jwt:
+  session:
+    validation:
+      enabled: true
+
+logging:
+  file:
+    name: "${catalina.base:./}/logs/ecomapi.log"
+  level:
+    root: INFO
+    "[com.svm]": DEBUG
+    "[com.svm.ecom]": DEBUG
+    "[com.svm.ecom.master]": INFO
+    "[com.solverminds]": DEBUG
+    "[com.solverminds.summary]": DEBUG
+    "[org.hibernate.SQL]": DEBUG
+    "[org.springframework]": DEBUG
+    "[org.springframework.context]": DEBUG
+    "[org.apache.coyote.http11.Http11Processor]": WARN
+
+ecom:
+  api:
+    base-path: /api/v1
+  auth:
+    maxWrongAttempts: 5
+    lockMinutes: 30
+    accessTtlSeconds: 1800
+  register:
+    default-status: "A"
+    default-timezone: Asia/Kolkata
+  summary:
+    default-timezone: Asia/Kolkata

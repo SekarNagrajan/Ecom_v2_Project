@@ -1,0 +1,744 @@
+// Modified by Sekar Nagarajan (2026-09-16 15:52)
+import { theme } from "antd";
+
+import { tokenMix } from "../../theme/utils/token-mix";
+
+/** Token-backed styles for SI/BL cargo list+grid editor. */
+export function CargoLinesEditorStyles() {
+  const { token } = theme.useToken();
+  const successBg = tokenMix(token.colorSuccess, 12);
+  const warningBg = tokenMix(token.colorWarning, 12);
+  const fillHover = token.colorFillAlter;
+  const headerBg = token.colorFillAlter;
+
+  return (
+    <style>{`
+      .si-cargo-editor {
+        display: flex;
+        flex-direction: column;
+        gap: ${token.marginMD}px;
+      }
+
+      /* —— Controls card (toolbar + summary) —— */
+      .si-cargo-controls {
+        display: flex;
+        flex-direction: column;
+        gap: ${token.marginSM}px;
+        padding: ${token.paddingMD}px;
+        background: ${token.colorBgContainer};
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+      }
+      .si-cargo-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: ${token.marginSM}px ${token.marginMD}px;
+      }
+      .si-cargo-toolbar__filters,
+      .si-cargo-toolbar__actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: ${token.marginSM}px;
+        min-width: 0;
+      }
+      .si-cargo-toolbar__actions {
+        justify-content: flex-end;
+      }
+      .si-cargo-toolbar__search {
+        flex: 1 1 220px;
+        min-width: 180px;
+        max-width: 320px;
+      }
+      .si-cargo-toolbar__add {
+        display: inline-flex;
+        align-items: center;
+        gap: ${token.marginXS}px;
+        padding-left: ${token.paddingSM}px;
+        border-left: 1px solid ${token.colorBorderSecondary};
+        height: ${token.controlHeightLG}px;
+      }
+      .si-cargo-toolbar__add > span {
+        display: inline-flex;
+        align-items: center;
+        height: 100%;
+      }
+      .si-cargo-toolbar__add-qty.ant-input-number {
+        width: ${token.controlHeightLG * 2}px;
+        height: ${token.controlHeightLG}px;
+      }
+      .si-cargo-toolbar__add-qty.ant-input-number .ant-input-number-input {
+        height: ${token.controlHeightLG}px;
+        text-align: center;
+      }
+      .si-cargo-toolbar__add-type.ant-select {
+        width: ${token.controlHeightLG * 2.75}px;
+        height: ${token.controlHeightLG}px;
+      }
+      .si-cargo-toolbar__add-type .ant-select-selector {
+        height: ${token.controlHeightLG}px !important;
+        display: flex !important;
+        align-items: center;
+      }
+      .si-cargo-toolbar__add-type .ant-select-selection-item,
+      .si-cargo-toolbar__add-type .ant-select-selection-placeholder {
+        line-height: ${token.controlHeightLG - 2}px !important;
+      }
+      .si-cargo-toolbar__add-btn.ant-btn {
+        height: ${token.controlHeightLG}px;
+        min-width: ${token.controlHeightLG * 4}px;
+        padding-inline: ${token.paddingMD}px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .si-cargo-toolbar__add-times {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: ${token.controlHeightLG / 2}px;
+        height: ${token.controlHeightLG}px;
+        flex: none;
+      }
+      .si-cargo-chip.ant-btn {
+        border-radius: ${token.borderRadiusLG * 2}px;
+        height: ${token.controlHeightLG}px;
+      }
+      .si-cargo-chip--on.ant-btn {
+        color: ${token.colorWarning};
+        border-color: ${token.colorWarningBorder};
+        background: ${warningBg};
+      }
+
+      .si-cargo-summary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: ${token.marginSM}px ${token.marginLG}px;
+        padding-top: ${token.paddingSM}px;
+        border-top: 1px solid ${token.colorBorderSecondary};
+      }
+      .si-cargo-summary__metric {
+        display: inline-flex;
+        align-items: baseline;
+        gap: ${token.marginXXS}px;
+        min-width: 0;
+      }
+      .si-cargo-summary__metric-value {
+        font-variant-numeric: tabular-nums;
+      }
+      .si-cargo-summary__filter-hint {
+        margin-left: auto;
+      }
+
+      .si-cargo-vchip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: ${token.marginXXS}px;
+        min-height: 22px;
+        padding: 0 ${token.paddingXS}px;
+        border-radius: ${token.borderRadiusLG * 2}px;
+        font-size: ${token.fontSizeSM}px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .si-cargo-vchip--ok {
+        background: ${successBg};
+        color: ${token.colorSuccess};
+      }
+      .si-cargo-vchip--warn {
+        background: ${warningBg};
+        color: ${token.colorWarning};
+      }
+
+      /* —— Container list —— */
+      .si-cargo-list {
+        display: flex;
+        flex-direction: column;
+        gap: ${token.marginSM}px;
+      }
+      .si-cargo-sicard {
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        background: ${token.colorBgContainer};
+        overflow: hidden;
+      }
+      /* Modified by Sekar Nagarajan (2026-09-01 16:30) — wider commod/pkgs columns + gap */
+      .si-cargo-ct-row-wrap {
+        display: grid;
+        grid-template-columns:
+          28px
+          minmax(128px, 1.4fr)
+          64px
+          minmax(96px, 1fr)
+          96px
+          104px
+          88px
+          88px
+          104px
+          72px;
+        align-items: center;
+        column-gap: ${token.marginMD}px;
+        padding: ${token.paddingSM}px ${token.paddingMD}px;
+        min-height: ${token.controlHeightLG + token.paddingSM * 2}px;
+        cursor: pointer;
+      }
+      .si-cargo-ct-row-wrap:hover {
+        background: ${fillHover};
+      }
+      .si-cargo-ct-row-wrap:focus-visible {
+        outline: 2px solid ${token.colorPrimary};
+        outline-offset: -2px;
+      }
+      .si-cargo-ct-chev {
+        color: ${token.colorTextQuaternary};
+        transition: transform 0.15s ease;
+        justify-self: center;
+      }
+      .si-cargo-ct-chev--open {
+        transform: rotate(180deg);
+      }
+      .si-cargo-ct-no {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .si-cargo-ct-no--empty {
+        color: ${token.colorTextQuaternary};
+        font-weight: 500;
+        font-style: italic;
+      }
+      .si-cargo-type-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 22px;
+        padding: 0 ${token.paddingXS}px;
+        border-radius: ${token.borderRadiusSM}px;
+        background: ${token.colorFillSecondary};
+        color: ${token.colorTextSecondary};
+        font-size: ${token.fontSizeSM}px;
+        font-weight: 600;
+        justify-self: start;
+      }
+      .si-cargo-ct-seal {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .si-cargo-ct-meta {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        line-height: 1.25;
+      }
+      .si-cargo-ct-meta--end {
+        align-items: flex-end;
+        text-align: right;
+      }
+      .si-cargo-ct-meta__value {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .si-cargo-ct-meta__label {
+        font-size: ${token.fontSizeSM}px;
+        color: ${token.colorTextQuaternary};
+        white-space: nowrap;
+      }
+      .si-cargo-ct-status {
+        justify-self: end;
+      }
+      .si-cargo-ct-actions {
+        justify-self: end;
+        display: inline-flex;
+        justify-content: flex-end;
+      }
+
+      .si-cargo-editor-panel {
+        padding: ${token.paddingMD}px;
+        border-top: 1px solid ${token.colorBorderSecondary};
+        background: ${token.colorFillAlter};
+      }
+      .si-cargo-editor-fields {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-items: end;
+        gap: ${token.marginMD}px;
+        margin-bottom: ${token.marginMD}px;
+      }
+      .si-cargo-editor-fields .form-field-cell {
+        min-width: 0;
+      }
+      .si-cargo-sitem {
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        padding: ${token.paddingMD}px;
+        background: ${token.colorBgContainer};
+        margin-bottom: ${token.marginSM}px;
+      }
+      .si-cargo-sitem:last-of-type {
+        margin-bottom: 0;
+      }
+      .si-cargo-sitem__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: ${token.marginSM}px;
+        margin-bottom: ${token.marginSM}px;
+      }
+      /* Modified by Sekar Nagarajan (2026-09-01 16:46) — row1 HS/pkg/qty/wt; row2 desc/marks */
+      .si-cargo-sitem__grid {
+        display: grid;
+        grid-template-columns:
+          minmax(0, 1.6fr) minmax(0, 1.2fr) auto auto;
+        gap: ${token.marginSM}px ${token.marginMD}px;
+        align-items: start;
+      }
+      .si-cargo-sitem__grid .form-field-cell {
+        min-width: 0;
+      }
+      .si-cargo-sitem__span {
+        grid-column: 1 / -1;
+      }
+      .si-cargo-sitem__hs {
+        grid-column: auto;
+      }
+      .si-cargo-sitem__half {
+        grid-column: span 2;
+      }
+      .si-cargo-sitem__narrow {
+        width: ${token.controlHeightLG * 4.5}px;
+        flex: 0 0 auto;
+      }
+      .si-cargo-sitem__narrow .booking-qty-stepper,
+      .si-cargo-sitem__narrow .ant-input-number {
+        width: 100%;
+        max-width: 100%;
+      }
+      .si-cargo-empty {
+        text-align: center;
+        padding: ${token.paddingXL}px;
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        background: ${token.colorBgContainer};
+      }
+      .si-cargo-empty__icon {
+        display: inline-flex;
+        margin-bottom: ${token.marginSM}px;
+        color: ${token.colorTextQuaternary};
+      }
+      .si-cargo-grid-wrap {
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        background: ${token.colorBgContainer};
+        overflow: hidden;
+      }
+      .si-cargo-grid-scroll {
+        max-height: 60vh;
+        overflow: auto;
+      }
+      .si-cargo-grid {
+        display: table;
+        width: max-content;
+        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: ${token.fontSize}px;
+        table-layout: auto;
+        height: auto;
+        min-height: 0;
+      }
+      .si-cargo-grid thead th {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        /* Opaque sticky header so scrolling rows never bleed through */
+        background-color: ${token.colorBgContainer};
+        background-image: linear-gradient(${headerBg}, ${headerBg});
+        text-align: left;
+        font-size: ${token.fontSizeSM}px;
+        font-weight: 600;
+        color: ${token.colorTextSecondary};
+        padding: ${token.paddingSM}px ${token.paddingXS}px;
+        white-space: nowrap;
+        border-bottom: 1px solid ${token.colorBorderSecondary};
+        box-shadow: 0 1px 0 ${token.colorBorderSecondary};
+      }
+      .si-cargo-grid tbody td {
+        padding: ${token.paddingXXS}px ${token.paddingXS}px;
+        border-top: 1px solid ${token.colorBorderSecondary};
+        vertical-align: middle;
+        background: ${token.colorBgContainer};
+        position: relative;
+        z-index: 0;
+      }
+      .si-cargo-grid tbody tr:hover td {
+        background: ${fillHover};
+      }
+      .si-cargo-grid tbody tr.si-cargo-grid__grp td {
+        border-top: 2px solid ${token.colorBorder};
+      }
+      /* Keep AntD cell controls under sticky header while scrolling */
+      .si-cargo-grid tbody td .ant-select,
+      .si-cargo-grid tbody td .ant-select-selector,
+      .si-cargo-grid tbody td .ant-input,
+      .si-cargo-grid tbody td .ant-input-affix-wrapper,
+      .si-cargo-grid tbody td .ant-input-number,
+      .si-cargo-grid tbody td .ant-input-number-group-wrapper,
+      .si-cargo-grid tbody td .ant-switch,
+      .si-cargo-grid tbody td .list-actions-row {
+        position: relative;
+        z-index: 0;
+      }
+      /* Modified by Sekar Nagarajan (2026-09-15 11:15)
+         Sticky Actions + Container No + Type (booking cargo grid parity).
+         Must beat .si-cargo-grid tbody td position:relative (higher specificity). */
+      .si-cargo-grid thead th.si-cargo-grid__th-actions,
+      .si-cargo-grid tbody td.si-cargo-grid__td-actions {
+        position: sticky;
+        left: 0;
+        width: 112px;
+        min-width: 112px;
+        max-width: 112px;
+        box-shadow: none;
+        overflow: hidden;
+      }
+      .si-cargo-grid thead th.si-cargo-grid__th-actions {
+        z-index: 32;
+        background-color: ${token.colorBgContainer};
+        background-image: linear-gradient(${headerBg}, ${headerBg});
+      }
+      .si-cargo-grid tbody td.si-cargo-grid__td-actions {
+        z-index: 12;
+        background: ${token.colorBgContainer};
+      }
+      .si-cargo-grid tbody tr:hover td.si-cargo-grid__td-actions {
+        background: ${fillHover};
+      }
+      .si-cargo-grid thead th.si-cargo-grid__th-container,
+      .si-cargo-grid tbody td.si-cargo-grid__td-container {
+        position: sticky;
+        left: 112px;
+        width: 160px;
+        min-width: 160px;
+        max-width: 160px;
+        box-shadow: none;
+        overflow: hidden;
+      }
+      .si-cargo-grid thead th.si-cargo-grid__th-type,
+      .si-cargo-grid tbody td.si-cargo-grid__td-type {
+        position: sticky;
+        left: 272px;
+        width: 112px;
+        min-width: 112px;
+        max-width: 112px;
+        box-shadow: 1px 0 0 ${token.colorBorderSecondary};
+        overflow: hidden;
+      }
+      .si-cargo-grid thead th.si-cargo-grid__th-container,
+      .si-cargo-grid thead th.si-cargo-grid__th-type {
+        z-index: 31;
+        background-color: ${token.colorBgContainer};
+        background-image: linear-gradient(${headerBg}, ${headerBg});
+      }
+      .si-cargo-grid thead th.si-cargo-grid__th-type {
+        z-index: 30;
+      }
+      .si-cargo-grid tbody td.si-cargo-grid__td-container {
+        z-index: 11;
+        background: ${token.colorBgContainer};
+      }
+      .si-cargo-grid tbody td.si-cargo-grid__td-type {
+        z-index: 10;
+        background: ${token.colorBgContainer};
+      }
+      .si-cargo-grid tbody tr:hover td.si-cargo-grid__td-container,
+      .si-cargo-grid tbody tr:hover td.si-cargo-grid__td-type {
+        background: ${fillHover};
+      }
+      .si-cargo-grid tbody td.si-cargo-grid__td-container .si-cargo-grid__field--container {
+        min-width: 0 !important;
+        width: 100%;
+        max-width: 100%;
+      }
+      .si-cargo-grid__td-actions .list-actions-row {
+        display: inline-flex;
+        align-items: center;
+        gap: ${token.marginXXS}px;
+        flex-wrap: nowrap;
+      }
+      .si-cargo-grid__action-spacer {
+        display: inline-block;
+        width: ${token.controlHeightSM}px;
+        height: ${token.controlHeightSM}px;
+        flex: none;
+      }
+      .si-cargo-grid__cont {
+        display: inline-flex;
+        padding-inline: ${token.paddingXS}px;
+        color: ${token.colorTextQuaternary};
+        letter-spacing: 0.08em;
+      }
+      .si-cargo-grid__field {
+        width: 100%;
+      }
+      /* Modified by Sekar Nagarajan (2026-08-28 17:58) — match list-view fields */
+      .si-cargo-grid__field--container {
+        min-width: 132px;
+      }
+      .si-cargo-grid__field--seal {
+        min-width: 120px;
+      }
+      .si-cargo-grid__field--hs {
+        min-width: 220px;
+      }
+      .si-cargo-grid__field--kind {
+        min-width: 160px;
+      }
+      .si-cargo-grid__field--qty {
+        min-width: ${token.controlHeightLG * 4.5}px;
+        width: ${token.controlHeightLG * 4.5}px;
+      }
+      .si-cargo-grid__field--weight.ant-input-number,
+      .si-cargo-grid__field--weight.ant-input-number-group-wrapper {
+        min-width: ${token.controlHeightLG * 4.5}px;
+        width: ${token.controlHeightLG * 4.5}px;
+      }
+      .si-cargo-grid__field--desc {
+        min-width: 200px;
+      }
+      .si-cargo-grid__field--marks {
+        min-width: 140px;
+      }
+      .si-cargo-grid-hint {
+        padding: ${token.paddingSM}px ${token.paddingMD}px;
+        border-top: 1px solid ${token.colorBorderSecondary};
+        background: ${token.colorFillAlter};
+      }
+      .si-cargo-pager {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: ${token.marginSM}px;
+        padding: ${token.paddingSM}px ${token.paddingMD}px;
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        background: ${token.colorBgContainer};
+      }
+
+      @media (max-width: 1199px) {
+        .si-cargo-ct-row-wrap {
+          grid-template-columns:
+            28px
+            minmax(120px, 1.2fr)
+            56px
+            minmax(80px, 1fr)
+            88px
+            96px
+            80px
+            104px
+            64px;
+        }
+        .si-cargo-ct-meta--cbm {
+          display: none;
+        }
+      }
+      @media (max-width: 991px) {
+        .si-cargo-toolbar {
+          grid-template-columns: 1fr;
+        }
+        .si-cargo-toolbar__actions {
+          justify-content: flex-start;
+        }
+        .si-cargo-toolbar__add {
+          border-left: 0;
+          padding-left: 0;
+          width: 100%;
+          flex-wrap: wrap;
+        }
+        .si-cargo-editor-fields {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .si-cargo-sitem__grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .si-cargo-sitem__hs,
+        .si-cargo-sitem__half {
+          grid-column: span 1;
+        }
+        .si-cargo-sitem__narrow {
+          width: 100%;
+        }
+        .si-cargo-ct-row-wrap {
+          grid-template-columns: 28px minmax(0, 1fr) auto auto;
+          row-gap: ${token.marginXXS}px;
+        }
+        .si-cargo-ct-chev { grid-column: 1; grid-row: 1; }
+        .si-cargo-ct-no { grid-column: 2; grid-row: 1; }
+        .si-cargo-type-badge { grid-column: 3; grid-row: 1; }
+        .si-cargo-ct-actions { grid-column: 4; grid-row: 1 / span 2; align-self: center; }
+        .si-cargo-ct-seal { grid-column: 2; grid-row: 2; }
+        .si-cargo-ct-meta--commod { grid-column: 2; grid-row: 3; }
+        .si-cargo-ct-meta--pkgs { grid-column: 3; grid-row: 3; justify-self: end; }
+        .si-cargo-ct-meta--kg { grid-column: 2; grid-row: 4; }
+        .si-cargo-ct-meta--cbm { display: none; }
+        .si-cargo-ct-status { grid-column: 2 / 4; grid-row: 5; justify-self: start; }
+      }
+
+      /* Shared SI / BL cargo Excel + Smart Import toolbar */
+      .cargo-excel-import-toolbar {
+        border: none;
+        display: flex;
+        justify-content: flex-end;
+        width: 100%;
+        margin-bottom: ${token.marginMD}px;
+        margin-top: ${token.marginMD}px;
+        padding-inline: ${token.paddingMD}px;
+      }
+      .cargo-excel-import-toolbar .cargo-excel-import {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: ${token.marginSM}px;
+      }
+      .cargo-excel-import-modal.ant-modal {
+        width: 90vw !important;
+        max-width: 90vw;
+        top: 1vh;
+        padding-bottom: 0;
+      }
+      .cargo-excel-import-modal .ant-modal-content {
+        max-height: 84vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .cargo-excel-import-modal__body {
+        padding: ${token.paddingMD}px !important;
+        flex: 1;
+        min-height: 0;
+        max-height: none;
+        overflow: auto;
+      }
+      .cargo-excel-import-modal__content {
+        display: flex;
+        flex-direction: column;
+        min-height: 60vh;
+        height: 70vh;
+      }
+      .cargo-excel-import-modal__content .booking-import-page,
+      .cargo-excel-import-modal__content > * {
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* Smart Import modal — autoHeight grid; scroll shell for many rows */
+      .cargo-smart-import-modal.ant-modal {
+        width: 92vw !important;
+        max-width: 92vw;
+        top: 1vh;
+        padding-bottom: 0;
+      }
+      .cargo-smart-import-modal .ant-modal-content {
+        max-height: 88vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .cargo-smart-import-modal .ant-modal-header,
+      .cargo-smart-import-modal .ant-modal-footer {
+        flex-shrink: 0;
+      }
+      .cargo-smart-import-modal__body {
+        padding: ${token.paddingMD}px !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: auto !important;
+        display: flex !important;
+        flex-direction: column;
+      }
+      .cargo-smart-import-modal__content {
+        display: flex;
+        flex-direction: column;
+        gap: ${token.marginSM}px;
+        min-height: 0;
+      }
+      .cargo-smart-import-modal__banner {
+        flex-shrink: 0;
+        padding: ${token.paddingSM}px ${token.paddingMD}px;
+        background: ${token.colorFillAlter};
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+      }
+      .cargo-smart-import-modal__hint {
+        margin-bottom: 0 !important;
+        font-size: ${token.fontSize}px;
+        color: ${token.colorTextSecondary};
+        line-height: ${token.lineHeight};
+      }
+      .cargo-smart-import-grid {
+        width: 100%;
+        max-height: 62vh;
+        overflow: auto;
+        border: 1px solid ${token.colorBorderSecondary};
+        border-radius: ${token.borderRadiusLG}px;
+        background: ${token.colorBgContainer};
+      }
+      .cargo-smart-import-grid--empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+        padding: ${token.paddingLG}px;
+      }
+      .cargo-smart-import-list {
+        width: 100%;
+        height: auto !important;
+      }
+      .cargo-smart-import-cell--readonly {
+        background: ${token.colorFillAlter} !important;
+        color: ${token.colorTextSecondary};
+      }
+      .cargo-smart-import-col--readonly {
+        background: ${token.colorFillAlter} !important;
+      }
+      .cargo-smart-import-cell--editable {
+        background: ${token.colorBgContainer};
+      }
+      .cargo-smart-import-cell--numeric {
+        text-align: right;
+      }
+      .cargo-smart-import-cell--row-no {
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        justify-content: center;
+      }
+      .cargo-smart-import-cell--soc {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .cargo-smart-import-cell--soc .ag-checkbox-input-wrapper,
+      .cargo-smart-import-cell--soc .ag-cell-wrapper {
+        justify-content: center;
+      }
+      .cargo-smart-import-modal__footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: ${token.marginMD}px;
+        width: 100%;
+        flex-wrap: wrap;
+      }
+      .cargo-smart-import-modal__footer-meta {
+        font-size: ${token.fontSizeSM}px;
+      }
+    `}</style>
+  );
+}

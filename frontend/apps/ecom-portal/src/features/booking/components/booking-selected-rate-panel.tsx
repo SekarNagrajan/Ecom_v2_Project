@@ -1,0 +1,139 @@
+// Modified by Sekar Nagarajan (2026-09-10 22:38)
+import { AppButton } from "@solverminds/shared-ui";
+import { Card, Table, Typography } from "antd";
+
+import { useTranslation } from "react-i18next";
+import { AppIcon, Icons } from "../../../components/icons";
+import { ModuleEmptyState } from "../../../components/shared/module-empty-state";
+import type { BookingRateOption } from "../api/booking.api";
+
+const { Text } = Typography;
+
+interface BookingSelectedRatePanelProps {
+  rates: BookingRateOption[];
+  selectedRate: BookingRateOption | null;
+  loading: boolean;
+  selecting: boolean;
+  onSelect: (rate: BookingRateOption) => void;
+  onChange: () => void;
+}
+
+function formatRateAmount(rate: BookingRateOption): string {
+  return `${rate.amount.toLocaleString()} ${rate.currency}`;
+}
+
+export function BookingSelectedRatePanel({
+  rates,
+  selectedRate,
+  loading,
+  selecting,
+  onSelect,
+  onChange,
+}: BookingSelectedRatePanelProps) {
+  const { t } = useTranslation(["booking", "common"]);
+  if (selectedRate) {
+    return (
+      <Card
+        size="small"
+        title={t("booking:wizard.rates.title")}
+        className="form-step-card form-step-section booking-selected-rate-panel booking-selected-rate-panel--selected"
+        extra={
+          <AppButton
+            size="small"
+            type="default"
+            icon={<AppIcon icon={Icons.refreshCw} size={14} />}
+            onClick={onChange}
+          >
+            {t("booking:wizard.rates.changeRate")}
+          </AppButton>
+        }
+      >
+        <dl className="booking-selected-rate-panel__fields">
+          <div className="booking-selected-rate-panel__field">
+            <Text type="primary" className="booking-selected-rate-panel__label">
+              {t("booking:wizard.rates.rateNo")}
+            </Text>
+            <Text strong className="booking-selected-rate-panel__value">
+              {selectedRate.rateNo}
+            </Text>
+          </div>
+          <div className="booking-selected-rate-panel__field">
+            <Text type="primary" className="booking-selected-rate-panel__label">
+              {t("booking:wizard.rates.equipment")}
+            </Text>
+            <Text strong className="booking-selected-rate-panel__value">
+              {selectedRate.eqpType}
+            </Text>
+          </div>
+          <div className="booking-selected-rate-panel__field">
+            <Text type="primary" className="booking-selected-rate-panel__label">
+              {t("booking:wizard.rates.amount")}
+            </Text>
+            <Text strong className="booking-selected-rate-panel__value">
+              {formatRateAmount(selectedRate)}
+            </Text>
+          </div>
+        </dl>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      size="small"
+      title={t("booking:wizard.rates.availableTitle")}
+      className="form-step-card form-step-section booking-selected-rate-panel booking-selected-rate-panel--table"
+    >
+      <div className="booking-rates-table custom-scroll">
+        <Table
+          size="small"
+          rowKey={(r) => `${r.rateNo}-${r.itemNo}-${r.amdNo}`}
+          loading={loading}
+          pagination={false}
+          dataSource={rates}
+          columns={[
+            { title: t("booking:wizard.rates.rateNo"), dataIndex: "rateNo" },
+            {
+              title: t("booking:wizard.rates.equipment"),
+              dataIndex: "eqpType",
+              width: 140,
+            },
+            {
+              title: t("booking:wizard.rates.amount"),
+              key: "amount",
+              width: 140,
+              render: (_: unknown, row: BookingRateOption) =>
+                formatRateAmount(row),
+            },
+            {
+              title: "",
+              key: "select",
+              width: 110,
+              render: (_: unknown, row: BookingRateOption) => (
+                <AppButton
+                  type="primary"
+                  size="small"
+                  loading={selecting}
+                  disabled={selecting}
+                  onClick={() => void onSelect(row)}
+                >
+                  {t("common:actions.select")}
+                </AppButton>
+              ),
+            },
+          ]}
+          locale={{
+            emptyText: (
+              <ModuleEmptyState
+                artSize="sm"
+                variant="blank"
+                title={t("booking:wizard.rates.emptyLane")}
+                style={{ padding: 12 }}
+              />
+            ),
+          }}
+        />
+      </div>
+    </Card>
+  );
+}

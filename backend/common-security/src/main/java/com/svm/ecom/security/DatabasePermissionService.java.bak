@@ -1,0 +1,255 @@
+package com.svm.ecom.security;
+
+import com.svm.ecom.domain.user.UserPermission;
+import com.svm.ecom.infrastructure.user.UserPermissionRepository;
+import com.svm.ecom.infrastructure.user.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Database-driven permission service that replaces the properties-based approach.
+ * This service reads user permissions directly from the database and provides caching for performance.
+ */
+@Service
+public class DatabasePermissionService {
+
+    private static final Logger logger = LoggerFactory.getLogger(DatabasePermissionService.class);
+
+    @Autowired
+    private UserPermissionRepository permissionRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * Check if the current authenticated user has permission to access an endpoint
+     */
+    public boolean hasEndpointPermission(String endpoint) {
+        String username = getCurrentUsername();
+        if (username == null) {
+            logger.warn("No authenticated user found for endpoint permission check: {}", endpoint);
+            return false;
+        }
+        
+        return hasEndpointPermission(username, endpoint);
+    }
+
+    /**
+     * Check if a specific user has permission to access an endpoint
+     */
+    @Cacheable(value = "endpoint-permissions", key = "#username + '-' + #endpoint")
+    public boolean hasEndpointPermission(String username, String endpoint) {
+        if (username == null || endpoint == null) {
+            return false;
+        }
+        
+        // Check if user exists in ecomapi_users table first
+        if (!userRepository.existsByUsername(username)) {
+            logger.warn("User '{}' not found in ecomapi_users table", username);
+            return false;
+        }
+        
+        boolean hasPermission = permissionRepository.hasEndpointPermission(username, endpoint);
+        logger.debug("User '{}' endpoint permission check for '{}': {}", username, endpoint, hasPermission);
+        return hasPermission;
+    }
+
+    /**
+     * Check if the current authenticated user can view a Swagger API group
+     */
+    public boolean canViewSwaggerGroup(String apiGroup) {
+        String username = getCurrentUsername();
+        if (username == null) {
+            // If no user is authenticated, show basic groups (typically during app startup)
+            return "schedule-api".equals(apiGroup) || "ecom-api".equals(apiGroup);
+        }
+        
+        return canViewSwaggerGroup(username, apiGroup);
+    }
+
+    /**
+     * Check if a specific user can view a Swagger API group
+     */
+    @Cacheable(value = "swagger-permissions", key = "#username + '-' + #apiGroup")
+    public boolean canViewSwaggerGroup(String username, String apiGroup) {
+        if (username == null) {
+            return false;
+        }
+        
+        // Check if user exists in ecomapi_users table first
+        if (!userRepository.existsByUsername(username)) {
+            logger.warn("User '{}' not found in ecomapi_users table", username);
+            return false;
+        }
+        
+        boolean canView = permissionRepository.hasSwaggerGroupPermission(username, apiGroup);
+        logger.debug("User '{}' Swagger group visibility check for '{}': {}", username, apiGroup, canView);
+        return canView;
+    }
+
+    /**
+     * Get the current authenticated username
+     */
+    public String getCurrentUsername() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null && !auth.getName().equals("anonymousUser")) {
+                return auth.getName();
+            }
+        } catch (Exception e) {
+            logger.debug("Error getting current username: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Check if tracking endpoints are accessible to the current user
+     */
+    public boolean canAccessTracking() {
+        return hasEndpointPermission("tracking");
+    }
+
+    /**
+     * Check if tracking endpoints are accessible to a specific user
+     */
+    public boolean canAccessTracking(String username) {
+        return hasEndpointPermission(username, "tracking");
+    }
+
+    /**
+     * Check if schedule endpoints are accessible to the current user
+     */
+    public boolean canAccessSchedule() {
+        return hasEndpointPermission("schedule");
+    }
+
+    /**
+     * Check if schedule endpoints are accessible to a specific user
+     */
+    public boolean canAccessSchedule(String username) {
+        return hasEndpointPermission(username, "schedule");
+    }
+
+    /**
+     * Check if master endpoints are accessible to the current user
+     */
+    public boolean canAccessMaster() {
+        return hasEndpointPermission("master");
+    }
+
+    /**
+     * Check if master endpoints are accessible to a specific user
+     */
+    public boolean canAccessMaster(String username) {
+        return hasEndpointPermission(username, "master");
+    }
+
+    /**
+     * Get all endpoint permissions for a user
+     */
+    @Cacheable(value = "user-endpoint-permissions", key = "#username")
+    public Set<String> getUserEndpointPermissions(String username) {
+        if (!userRepository.existsByUsername(username)) {
+            return java.util.Collections.emptySet();
+        }
+        
+        List<String> permissions = permissionRepository.getEndpointPermissions(username);
+        return permissions.stream().collect(Collectors.toSet());
+    }
+
+    /**
+     * Get all swagger group permissions for a user
+     */
+    @Cacheable(value = "user-swagger-permissions", key = "#username")
+    public Set<String> getUserSwaggerGroupPermissions(String username) {
+        if (!userRepository.existsByUsername(username)) {
+            return java.util.Collections.emptySet();
+        }
+        
+        List<String> permissions = permissionRepository.getSwaggerGroupPermissions(username);
+        return permissions.stream().collect(Collectors.toSet());
+    }
+
+    /**
+     * Add a permission for a user
+     */
+    @Transactional
+    @CacheEvict(value = {"endpoint-permissions", "swagger-permissions", "user-endpoint-permissions", "user-swagger-permissions"}, allEntries = true)
+    public void addPermission(String username, String permissionType, String permissionValue, String description) {
+        if (!userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("User '" + username + "' not found in ecomapi_users table");
+        }
+        
+        UserPermission permission = new UserPermission(username, permissionType, permissionValue, description);
+        permissionRepository.save(permission);
+        logger.info("Added permission: {} = {} for user: {}", permissionType, permissionValue, username);
+    }
+
+    /**
+     * Remove a specific permission for a user
+     */
+    @Transactional
+    @CacheEvict(value = {"endpoint-permissions", "swagger-permissions", "user-endpoint-permissions", "user-swagger-permissions"}, allEntries = true)
+    public void removePermission(String username, String permissionType, String permissionValue) {
+        permissionRepository.deleteByUsernameAndPermissionTypeAndPermissionValue(username, permissionType, permissionValue);
+        logger.info("Removed permission: {} = {} for user: {}", permissionType, permissionValue, username);
+    }
+
+    /**
+     * Set all permissions for a user (replaces existing permissions)
+     */
+    @Transactional
+    @CacheEvict(value = {"endpoint-permissions", "swagger-permissions", "user-endpoint-permissions", "user-swagger-permissions"}, allEntries = true)
+    public void setUserPermissions(String username, List<String> endpointPermissions, List<String> swaggerGroupPermissions) {
+        if (!userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("User '" + username + "' not found in ecomapi_users table");
+        }
+        
+        // Remove existing permissions
+        permissionRepository.deleteByUsername(username);
+        
+        // Add endpoint permissions
+        if (endpointPermissions != null) {
+            for (String endpoint : endpointPermissions) {
+                UserPermission permission = new UserPermission(username, UserPermission.PermissionType.ENDPOINT, endpoint);
+                permissionRepository.save(permission);
+            }
+        }
+        
+        // Add swagger group permissions
+        if (swaggerGroupPermissions != null) {
+            for (String swaggerGroup : swaggerGroupPermissions) {
+                UserPermission permission = new UserPermission(username, UserPermission.PermissionType.SWAGGER_GROUP, swaggerGroup);
+                permissionRepository.save(permission);
+            }
+        }
+        
+        logger.info("Updated all permissions for user: {}", username);
+    }
+
+    /**
+     * Get all users with permissions
+     */
+    public List<String> getAllUsersWithPermissions() {
+        return permissionRepository.findAllUsersWithPermissions();
+    }
+
+    /**
+     * Clear all caches (useful for testing or manual cache refresh)
+     */
+    @CacheEvict(value = {"endpoint-permissions", "swagger-permissions", "user-endpoint-permissions", "user-swagger-permissions"}, allEntries = true)
+    public void clearPermissionCaches() {
+        logger.info("Cleared all permission caches");
+    }
+}

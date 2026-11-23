@@ -1,0 +1,134 @@
+{
+  "bookingNumber": "AE00564300",
+  "vesselCode": "000107",
+  "voyageCode": "444",
+  "loadBound": "N",
+  "t2lFilling": "N",
+  "ensFilling": "N",
+  "documentationType": "N",
+  "agencyRefNo": "REF001",
+
+  "originPortId": "AEJEA",
+  "loadPortId": "AEJEA",
+  "dischargePortId": "INNSA",
+  "finalPortId": "INNSA",
+
+  "status": "S",
+
+  "plaHeaderName": "JEBEL ALI,AE",
+  "polHeaderName": "JEBEL ALI,AE",
+  "podHeaderName": "NHAVA SHEVA,MH,IN",
+  "pldHeaderName": "NHAVA SHEVA,MH,IN",
+
+  "serviceCode": "ADAS",
+  "polTerminal": "AEJEA01",
+
+  "shipperName": "DUBAI NXTON",
+  "shipperAddress": "Dubai Fort Fortress Dubai Plaza Ajman BEJ UNITED ARAB EMIRATES",
+
+  "consigeeName": "ARULPRAKASH S",
+  "consigeeAddress": "Chennai 603103 INDIA",
+
+  "notifyName": "ARULPRAKASH S",
+  "notifyAddress": "Chennai 603103 INDIA",
+
+  "freight": "P",
+  "releaseType": "ORIG",
+  "blType": "COMBINED TRANSPORT B/L",
+
+  "requestedSI": 1,
+  "createdSI": 1,
+
+  "customers": [
+    {
+      "customerType": "SH",
+      "customerCode": "ECOM TESTING",
+      "countryId": "IN",
+      "customerName": "Xiamen Area of China",
+      "address": "513B, Building A, Free Trade Financial Center",
+      "address2": "603103",
+      "city": "AJMAN",
+      "telephone": "86-38-00138000",
+      "email": "dhiman.p@solverminds.com",
+      "stateId": ""
+    },
+    {
+      "customerType": "CN",
+      "customerCode": "ECOM TESTING",
+      "countryId": "IN",
+      "customerName": "Xiamen Area of China",
+      "address": "513B, Building A, Free Trade Financial Center",
+      "address2": "603103",
+      "city": "AJMAN",
+      "telephone": "86-38-00138000",
+      "email": "dhiman.p@solverminds.com",
+      "stateId": ""
+    },
+    {
+      "customerType": "NT",
+      "customerCode": "ECOM TESTING",
+      "countryId": "IN",
+      "customerName": "Xiamen Area of China",
+      "address": "513B, Building A, Free Trade Financial Center",
+      "address2": "603103",
+      "city": "AJMAN",
+      "telephone": "86-38-00138000",
+      "email": "dhiman.p@solverminds.com",
+      "stateId": ""
+    }
+  ],
+
+  "containers": [
+    {
+      "cargoNo": 1,
+      "containerNo": "ABDU0408131",
+      "equipmentType": "D",
+      "equipmentSize": "20DC",
+      "soc": "N",
+      "carrierSeal": "CS1",
+      "shipperSeal": "",
+      "tareWeight": 2200,
+      "cargoWeight": 5000,
+      "grossWeight": 7200,
+      "weightUnit": "K",
+      "nor": "N",
+      "equipmentStatus": "F",
+      "oog": "N",
+      "rateEquipmentTypeId": "20DC",
+      "reeferFlag": "Y",
+      "reefer": {
+        "setTemp": 5,
+        "minTemp": 2,
+        "maxTemp": 8,
+        "tempUnit": "C",
+        "humidity": 60,
+        "humidityFlag": "Y",
+        "drains": "OPEN",
+        "co2Value": 5,
+        "o2Value": 21,
+        "ventilation": "OPEN"
+      }
+    }
+  ],
+  "commodities": [
+    {
+      "cargoNo": 1,
+      "containerNo": "ABDU0408131",
+      "itemNo": 1,
+      "commodityGroup": 91,
+      "packageType": "CMPK",
+      "packageQty": 1,
+      "hsCode": "9101",
+      "hazardous": "Y",
+      "dangerousGoods": {
+        "marinePollutant": "N",
+        "unNo": "1203",
+        "dgClass": "3",
+        "flashPoint": 23,
+        "flashPointUnit": "C",
+        "imoContact": "IMO CONTACT NAME",
+        "imoPhone": "+919876543210"
+      }
+    }
+  ]
+}

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Booking Documents API v2 - Implementation Document</title>
+    <style>
+        body {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #1a365d;
+            font-size: 24pt;
+            border-bottom: 3px solid #1a365d;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c5282;
+            font-size: 16pt;
+            margin-top: 30px;
+            border-bottom: 1px solid #2c5282;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #2d3748;
+            font-size: 13pt;
+            margin-top: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #cbd5e0;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #e2e8f0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+        code {
+            background-color: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+            font-size: 10pt;
+        }
+        pre {
+            background-color: #1a202c;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: Consolas, monospace;
+            font-size: 10pt;
+        }
+        .endpoint {
+            background-color: #ebf8ff;
+            border-left: 4px solid #3182ce;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .success { color: #276749; }
+        .note {
+            background-color: #fffaf0;
+            border-left: 4px solid #dd6b20;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .header-info {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 10pt;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Booking Documents API v2</h1>
+<p class="header-info">Implementation Document<br>
+<strong>Prepared for:</strong> Tailwind Shipping<br>
+<strong>Date:</strong> January 28, 2026</p>
+
+<h2>1. Overview</h2>
+<p>This document outlines our implementation plan for the Booking Documents API v2 as specified in the client's OpenAPI specification. We have reviewed the requirements and identified our approach for each endpoint.</p>
+
+<h2>2. Data Storage Architecture</h2>
+<div class="note">
+    <strong>Important:</strong> Document metadata is retrieved directly from the file system, not from a database table.
+</div>
+
+<p>Documents are stored in a shared folder structure organized by booking ID:</p>
+<pre>&lt;base_path&gt;/Ecom/{bookingId}/
+    ├── invoice.pdf
+    ├── customs_manifest.pdf
+    └── bill_of_lading.pdf</pre>
+
+<p><strong>How metadata is retrieved:</strong></p>
+<table>
+    <tr>
+        <th>Field</th>
+        <th>Source</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td><code>fileName</code></td>
+        <td>File System</td>
+        <td>Name of the file from <code>file.getName()</code></td>
+    </tr>
+    <tr>
+        <td><code>fileSize</code></td>
+        <td>File System</td>
+        <td>File size in bytes from <code>file.length()</code></td>
+    </tr>
+    <tr>
+        <td><code>lastModified</code></td>
+        <td>File System</td>
+        <td>Last modified timestamp from <code>file.lastModified()</code></td>
+    </tr>
+</table>
+
+<p><strong>Benefits of this approach:</strong></p>
+<ul>
+    <li>No database schema changes required for document metadata</li>
+    <li>Metadata is always in sync with actual files</li>
+    <li>Reduced database overhead</li>
+    <li>Files can be managed externally if needed</li>
+</ul>
+
+<p><strong>Path configuration:</strong> The base path is configured in the <code>emssetting</code> table with <code>modulename='Bill of Lading'</code> and <code>status='A'</code>.</p>
+
+<h2>3. API Endpoints Summary</h2>
+<table>
+    <tr>
+        <th>Method</th>
+        <th>Endpoint</th>
+        <th>Description</th>
+        <th>Status</th>
+    </tr>
+    <tr>
+        <td><strong>GET</strong></td>
+        <td><code>/api/v2/bookings/{bookingId}/documents</code></td>
+        <td>List booking documents</td>
+        <td class="success">✅ Will implement</td>
+    </tr>
+    <tr>
+        <td><strong>POST</strong></td>
+        <td><code>/api/v2/bookings/{bookingId}/documents</code></td>
+        <td>Upload booking documents</td>
+        <td class="success">✅ Will implement</td>
+    </tr>
+    <tr>
+        <td><strong>GET</strong></td>
+        <td><code>/api/v2/bookings/{bookingId}/documents/{fileName}</code></td>
+        <td>Download document</td>
+        <td class="success">✅ Will implement</td>
+    </tr>
+    <tr>
+        <td><strong>DELETE</strong></td>
+        <td><code>/api/v2/bookings/{bookingId}/documents/{fileName}</code></td>
+        <td>Delete document</td>
+        <td class="success">✅ Will implement</td>
+    </tr>
+</table>
+
+<h2>4. Endpoint Details</h2>
+
+<h3>3.1 List Booking Documents</h3>
+<div class="endpoint">
+    <strong>Endpoint:</strong> <code>GET /api/v2/bookings/{bookingId}/documents</code>
+</div>
+
+<p><strong>Response Format (200 OK):</strong></p>
+<pre>[
+  {
+    "fileName": "customs_manifest.pdf",
+    "fileSize": 102400,
+    "lastModified": "2026-01-05T09:00:00Z"
+  },
+  {
+    "fileName": "invoice.pdf",
+    "fileSize": 51200,
+    "lastModified": "2026-01-04T17:00:00Z"
+  }
+]</pre>
+
+<p><strong>Implementation Notes:</strong></p>
+<ul>
+    <li>Returns metadata for all documents attached to the specified booking</li>
+    <li><code>lastModified</code> will be in ISO 8601 format (UTC timezone)</li>
+    <li>Returns empty array <code>[]</code> if no documents exist</li>
+    <li><code>bookingId</code> can be booking request ID (e.g., BKON123) or confirmed booking ID (e.g., TSHG1234)</li>
+</ul>
+
+<h3>3.2 Upload Booking Documents</h3>
+<div class="endpoint">
+    <strong>Endpoint:</strong> <code>POST /api/v2/bookings/{bookingId}/documents</code>
+</div>
+
+<p><strong>Request:</strong></p>
+<ul>
+    <li>Content-Type: <code>multipart/form-data</code></li>
+    <li>Field: <code>files</code> (array of binary files)</li>
+</ul>
+
+<p><strong>Response:</strong></p>
+<ul>
+    <li><strong>201 Created</strong> - Successfully uploaded</li>
+    <li><strong>409 Conflict</strong> - File with identical name already exists</li>
+</ul>
+
+<p><strong>Validation Rules:</strong></p>
+<table>
+    <tr>
+        <th>Rule</th>
+        <th>Description</th>
+    </tr>
+    <tr>
+        <td>File Count</td>
+        <td>1-5 files per request</td>
+    </tr>
+    <tr>
+        <td>File Size</td>
+        <td>Max 10 MB per file</td>
+    </tr>
+    <tr>
+        <td>Total Size</td>
+        <td>Max 50 MB per request</td>
+    </tr>
+    <tr>
+        <td>File Types</td>
+        <td>No executables (.exe, .jar, .bat, .sh, .cmd, .msi), audio, or video files</td>
+    </tr>
+    <tr>
+        <td>Duplicate Names</td>
+        <td>Not allowed in same request</td>
+    </tr>
+</table>
+
+<h3>3.3 Download Document</h3>
+<div class="endpoint">
+    <strong>Endpoint:</strong> <code>GET /api/v2/bookings/{bookingId}/documents/{fileName}</code>
+</div>
+
+<p><strong>Response:</strong></p>
+<ul>
+    <li><strong>200 OK</strong> - Returns binary file content</li>
+    <li>Content-Type: <code>application/octet-stream</code></li>
+</ul>
+
+<p><strong>Implementation Notes:</strong></p>
+<ul>
+    <li>Returns the raw file content for download</li>
+    <li><code>fileName</code> must be URL-encoded if it contains special characters</li>
+    <li>File is streamed directly without loading entire content into memory</li>
+</ul>
+
+<h3>3.4 Delete Document</h3>
+<div class="endpoint">
+    <strong>Endpoint:</strong> <code>DELETE /api/v2/bookings/{bookingId}/documents/{fileName}</code>
+</div>
+
+<p><strong>Response:</strong></p>
+<ul>
+    <li><strong>204 No Content</strong> - Successfully deleted</li>
+    <li><strong>404 Not Found</strong> - Document does not exist</li>
+    <li><strong>409 Conflict</strong> - Document cannot be deleted (e.g., in use by another process)</li>
+</ul>
+
+<div class="note">
+    <strong>Note:</strong> This action permanently removes the document and cannot be undone.
+</div>
+
+<h2>5. Error Response Format</h2>
+<p>All error responses follow RFC 7807 Problem Details format:</p>
+<pre>{
+  "detail": "The requested document was not found.",
+  "title": "Not Found",
+  "status": 404,
+  "type": "https://api.tailwind-shipping.com/problems/not-found",
+  "instance": "/api/v2/bookings/BKON123/documents/missing.pdf",
+  "code": "DOCUMENT_NOT_FOUND"
+}</pre>
+
+<h3>Standard Error Responses</h3>
+<table>
+    <tr>
+        <th>HTTP Status</th>
+        <th>Description</th>
+        <th>When Returned</th>
+    </tr>
+    <tr>
+        <td><strong>400</strong></td>
+        <td>Bad Request</td>
+        <td>Invalid syntax or parameters</td>
+    </tr>
+    <tr>
+        <td><strong>401</strong></td>
+        <td>Unauthorized</td>
+        <td>Missing or invalid Bearer token</td>
+    </tr>
+    <tr>
+        <td><strong>403</strong></td>
+        <td>Forbidden</td>
+        <td>User doesn't have access</td>
+    </tr>
+    <tr>
+        <td><strong>404</strong></td>
+        <td>Not Found</td>
+        <td>Booking or document not found</td>
+    </tr>
+    <tr>
+        <td><strong>409</strong></td>
+        <td>Conflict</td>
+        <td>File already exists (upload) or cannot be deleted</td>
+    </tr>
+    <tr>
+        <td><strong>500</strong></td>
+        <td>Internal Server Error</td>
+        <td>Unexpected server error</td>
+    </tr>
+    <tr>
+        <td><strong>503</strong></td>
+        <td>Service Unavailable</td>
+        <td>Service temporarily unavailable</td>
+    </tr>
+</table>
+
+<h2>6. Authentication</h2>
+<p>All endpoints require JWT Bearer token authentication:</p>
+<pre>Authorization: Bearer &lt;JWT_TOKEN&gt;</pre>
+<p>The token must be obtained through the authentication endpoint and included in all requests.</p>
+
+<h2>7. Implementation Timeline</h2>
+<table>
+    <tr>
+        <th>Phase</th>
+        <th>Task</th>
+        <th>Duration</th>
+    </tr>
+    <tr>
+        <td>1</td>
+        <td>Create v2 Controller & DTOs</td>
+        <td>1 day</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>Implement List & Upload endpoints</td>
+        <td>1 day</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>Implement Download & Delete endpoints</td>
+        <td>1 day</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>Error handling (RFC 7807)</td>
+        <td>0.5 day</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>Testing & Documentation</td>
+        <td>1.5 days</td>
+    </tr>
+    <tr>
+        <td colspan="2"><strong>Total</strong></td>
+        <td><strong>5 days</strong></td>
+    </tr>
+</table>
+
+<h2>8. Questions for Client</h2>
+<ol>
+    <li><strong>File Retention Policy:</strong> Should deleted files be permanently removed or moved to an archive?</li>
+    <li><strong>Concurrent Access:</strong> If multiple users upload a file with the same name simultaneously, should we use first-writer-wins or return 409 to both?</li>
+    <li><strong>File Name Restrictions:</strong> Are there any specific character restrictions for file names beyond standard OS limitations?</li>
+    <li><strong>Audit Trail:</strong> Should we maintain an audit log of document uploads/deletions?</li>
+</ol>
+
+<h2>9. Contact</h2>
+<p>For any questions or clarifications regarding this implementation, please contact our development team.</p>
+
+<div class="footer">
+    <p><strong>Document Version:</strong> 1.0<br>
+    <strong>Last Updated:</strong> January 28, 2026<br>
+    <strong>Prepared by:</strong> Solverminds Development Team</p>
+</div>
+
+</body>
+</html>
+

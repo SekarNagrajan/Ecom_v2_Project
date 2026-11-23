@@ -1,0 +1,448 @@
+// Modified by Sekar Nagarajan (2026-11-16 16:45) — surcharge drawer book/share actions
+// Controller hook for Rates — mode-aware cards + surcharge rollup (JSP parity)
+
+import { useToast } from "@solverminds/shared-ui/hooks";
+import { useNavigate } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { useModuleViewMode } from "../../../components/shared/hooks/use-module-view-mode";
+import {
+  useContractsQuery,
+  useQuotesQuery,
+  useSurchargesQuery,
+  useTariffsQuery,
+} from "../api/rates.queries";
+import type { RateSearchMode, RateSearchParams } from "../components/RateSearchFilter";
+import type {
+  CombinedRateItem,
+  ContractDTO,
+  CreateQuoteInput,
+  QuoteDTO,
+} from "../types/rates.types";
+import { normalizeRateEquipment, portCodeFromLabel } from "../utils/rate-equipment";
+
+// Modified by Sekar Nagarajan (2026-10-17 02:30) — default to the lane the extracted tariffs and bookings cover
+const DEFAULT_SEARCH_PARAMS: RateSearchParams = {
+  searchMode: "PUBLISHED_TARIFF",
+  polCode: "INNSA",
+  podCode: "AEJEA",
+  eqpType: "20' Standard Dry",
+  commodity: "GEN-CGO",
+};
+
+const RATES_VIEW_MODE_KEY = "ecom.rates.viewMode.v2";
+
+function getResultsTitle(mode: RateSearchMode, t: TFunction<"rates">): string {
+  switch (mode) {
+    case "PUBLISHED_TARIFF":
+      return t("modes.results.publishedTariff");
+    case "SERVICE_CONTRACTS":
+      return t("modes.results.serviceContracts");
+    case "SURCHARGES":
+      return t("modes.results.surcharges");
+    case "SPOT_QUOTES":
+      return t("modes.results.spotQuotes");
+    default: {
+      const _exhaustive: never = mode;
+      return _exhaustive;
+    }
+  }
+}
+
+export function useRatesController() {
+  const { t } = useTranslation(["rates", "common", "modules"]);
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { viewMode, setViewMode } = useModuleViewMode(RATES_VIEW_MODE_KEY, "card");
+  const [searchParams, setSearchParams] = useState<RateSearchParams>(DEFAULT_SEARCH_PARAMS);
+  /** Results only after explicit Search (or deep-link from landing). */
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isQuoteDrawerOpen, setIsQuoteDrawerOpen] = useState(false);
+  const [quoteDefaults, setQuoteDefaults] = useState<Partial<CreateQuoteInput> | undefined>(
+    undefined,
+  );
+  const [isShareMailOpen, setIsShareMailOpen] = useState(false);
+  const [shareMailRates, setShareMailRates] = useState<CombinedRateItem[]>([]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pol = urlParams.get("pol") || urlParams.get("ratepol");
+    const pod = urlParams.get("pod") || urlParams.get("ratepod");
+    const eqp = urlParams.get("eqpType") || urlParams.get("rateseqp");
+    const shipmentDate = urlParams.get("shipmentdate") || urlParams.get("date");
+
+    if (pol || pod || eqp) {
+      // Landing / deep links send port codes and the equipment master code (20DC, 40HC…);
+      // the filter works in its own vocabulary ("20' Standard Dry").
+      setSearchParams((prev) => ({
+        ...prev,
+        polCode: pol ? portCodeFromLabel(pol, prev.polCode ?? "") : prev.polCode,
+        podCode: pod ? portCodeFromLabel(pod, prev.podCode ?? "") : prev.podCode,
+        eqpType: eqp ? normalizeRateEquipment(eqp) : prev.eqpType,
+        fromDate: shipmentDate || prev.fromDate,
+      }));
+      setHasSearched(true);
+    }
+  }, []);
+
+  const [selectedContract, setSelectedContract] = useState<ContractDTO | null>(null);
+  const [surchargeRate, setSurchargeRate] = useState<CombinedRateItem | null>(null);
+  const [isSurchargeModalOpen, setIsSurchargeModalOpen] = useState(false);
+
+  const mode = searchParams.searchMode;
+  const commodityFilter =
+    searchParams.commodity && searchParams.commodity !== "ALL" ? searchParams.commodity : undefined;
+  const eqpFilter =
+    searchParams.eqpType && searchParams.eqpType !== "ALL" ? searchParams.eqpType : undefined;
+
+  const fetchTariffs = hasSearched && mode === "PUBLISHED_TARIFF";
+  const fetchContracts = hasSearched && mode === "SERVICE_CONTRACTS";
+  const fetchSurcharges = hasSearched && (mode === "PUBLISHED_TARIFF" || mode === "SURCHARGES");
+  const fetchQuotes = hasSearched && mode === "SPOT_QUOTES";
+
+  const { data: tariffs = [], isLoading: isTariffsLoading } = useTariffsQuery(
+    {
+      loadPort: searchParams.polCode,
+      dischPort: searchParams.podCode,
+      eqpType: eqpFilter,
+      commodity: commodityFilter,
+      date: searchParams.fromDate,
+    },
+    { enabled: fetchTariffs },
+  );
+
+  const { data: contracts = [], isLoading: isContractsLoading } = useContractsQuery(
+    {
+      pol: searchParams.polCode,
+      pod: searchParams.podCode,
+    },
+    { enabled: fetchContracts },
+  );
+
+  const { data: surcharges = [], isLoading: isSurchargesLoading } = useSurchargesQuery(
+    {
+      pol: searchParams.polCode,
+      pod: searchParams.podCode,
+      eqpType: eqpFilter,
+    },
+    { enabled: fetchSurcharges },
+  );
+
+  const { data: quotes = [], isLoading: isQuotesLoading } = useQuotesQuery({
+    enabled: fetchQuotes,
+  });
+
+  const isLoading = !hasSearched
+    ? false
+    : (mode === "PUBLISHED_TARIFF" && (isTariffsLoading || isSurchargesLoading)) ||
+      (mode === "SERVICE_CONTRACTS" && isContractsLoading) ||
+      (mode === "SURCHARGES" && isSurchargesLoading) ||
+      (mode === "SPOT_QUOTES" && isQuotesLoading);
+
+  const surchargeRollup = surcharges.reduce((sum, s) => sum + s.amount, 0);
+  const hasNorSurcharge = surcharges.some((s) => s.isNor);
+
+  const contractCards: CombinedRateItem[] = contracts
+    .filter((ctr) => {
+      if (commodityFilter && ctr.commodity !== commodityFilter) return false;
+      if (eqpFilter && ctr.eqpType !== eqpFilter) return false;
+      return true;
+    })
+    .map((ctr, idx) => ({
+      id: ctr.id,
+      type: "CONTRACT" as const,
+      title: ctr.customerName,
+      code: ctr.contractNo,
+      originPort: ctr.originPort,
+      originPortName: ctr.originPortName,
+      deliveryPort: ctr.deliveryPort,
+      deliveryPortName: ctr.deliveryPortName,
+      eqpType: ctr.eqpType,
+      commodity: ctr.commodity,
+      commodityName: ctr.commodityName,
+      currency: ctr.currency,
+      baseAmount: ctr.oceanFreight,
+      surchargeAmount: ctr.subjectToChargesAmount,
+      totalEstimatedAmount: ctr.oceanFreight + ctr.subjectToChargesAmount,
+      effectiveFrom: ctr.effectiveFrom,
+      effectiveTo: ctr.effectiveTo,
+      isRecommended: idx === 0,
+      surcharges: ctr.surcharges,
+      soc: ctr.soc,
+      nor: ctr.nor ?? ctr.surcharges?.some((s) => s.isNor),
+      carrTerms: ctr.carrTerms,
+      transService: ctr.transService,
+    }));
+
+  const tariffCards: CombinedRateItem[] = tariffs.map((trf, idx) => ({
+    id: trf.id,
+    type: "TARIFF" as const,
+    title: t("rateCard.tariffDefaultTitle"),
+    code: `TRF-${trf.loadPort}-${trf.dischPort}`,
+    originPort: trf.loadPort,
+    originPortName: trf.loadPortName,
+    deliveryPort: trf.dischPort,
+    deliveryPortName: trf.dischPortName,
+    eqpType: trf.eqpType,
+    commodity: trf.commodityCode,
+    commodityName: trf.commodityName,
+    currency: trf.currency,
+    baseAmount: trf.tariffAmount,
+    surchargeAmount: surchargeRollup,
+    totalEstimatedAmount: trf.tariffAmount + surchargeRollup,
+    effectiveFrom: trf.effectiveFrom,
+    effectiveTo: trf.effectiveTo,
+    isRecommended: idx === 0 && contractCards.length === 0,
+    surcharges,
+    soc: trf.soc ?? "No",
+    nor: trf.nor ?? hasNorSurcharge,
+    transService: trf.transService,
+  }));
+
+  const surchargeCards: CombinedRateItem[] = surcharges.map((sur) => ({
+    id: sur.id,
+    type: "SURCHARGE" as const,
+    title: sur.chargeName,
+    code: sur.chargeCode,
+    originPort: sur.origin || searchParams.polCode || "",
+    originPortName: sur.loadRegion || sur.origin || "",
+    deliveryPort: sur.delivery || searchParams.podCode || "",
+    deliveryPortName: sur.dischargeRegion || sur.delivery || "",
+    eqpType: sur.eqpType,
+    commodity: "",
+    commodityName: sur.isNor ? t("rateCard.norApplicable") : t("rateCard.accessorialCommodity"),
+    currency: sur.currency,
+    baseAmount: sur.amount,
+    surchargeAmount: 0,
+    totalEstimatedAmount: sur.amount,
+    effectiveFrom: sur.effectiveFrom,
+    effectiveTo: sur.effectiveTo,
+    nor: sur.isNor,
+  }));
+
+  const quoteCards: CombinedRateItem[] = quotes
+    .filter((q) => {
+      if (searchParams.polCode && q.originPort && q.originPort !== searchParams.polCode) {
+        return false;
+      }
+      if (searchParams.podCode && q.deliveryPort && q.deliveryPort !== searchParams.podCode) {
+        return false;
+      }
+      return true;
+    })
+    .map((q) => ({
+      id: q.id,
+      type: "QUOTE" as const,
+      title: q.customerName,
+      code: q.quoteNo,
+      originPort: q.originPort,
+      originPortName: q.originPortName,
+      deliveryPort: q.deliveryPort,
+      deliveryPortName: q.deliveryPortName,
+      eqpType: q.eqpType,
+      commodity: q.commodity,
+      commodityName: q.commodity,
+      currency: "USD",
+      baseAmount: q.quotedAmountUsd,
+      surchargeAmount: 0,
+      totalEstimatedAmount: q.quotedAmountUsd,
+      effectiveFrom: q.validFrom,
+      effectiveTo: q.validTo,
+      quoteStatus: q.status,
+    }));
+
+  let cardRates: CombinedRateItem[] = [];
+  if (hasSearched) {
+    switch (mode) {
+      case "SERVICE_CONTRACTS":
+        cardRates = contractCards;
+        break;
+      case "SURCHARGES":
+        cardRates = surchargeCards;
+        break;
+      case "SPOT_QUOTES":
+        cardRates = quoteCards;
+        break;
+      case "PUBLISHED_TARIFF":
+        cardRates = tariffCards;
+        break;
+      default: {
+        const _exhaustive: never = mode;
+        cardRates = _exhaustive;
+        break;
+      }
+    }
+  }
+
+  const openQuoteDrawer = (defaults?: Partial<CreateQuoteInput>) => {
+    setQuoteDefaults({
+      originPort: defaults?.originPort ?? searchParams.polCode,
+      deliveryPort: defaults?.deliveryPort ?? searchParams.podCode,
+      eqpType: defaults?.eqpType ?? searchParams.eqpType,
+      commodity: defaults?.commodity ?? searchParams.commodity,
+      ...defaults,
+    });
+    setIsQuoteDrawerOpen(true);
+  };
+
+  const handleSearch = (params: RateSearchParams) => {
+    setSearchParams(params);
+    setHasSearched(true);
+    if (params.searchMode === "SPOT_QUOTES" && viewMode === "card") {
+      toast.info(t("search.toastSpotQuotes"));
+    } else {
+      toast.info(
+        t("search.toastSearching", {
+          title: getResultsTitle(params.searchMode, t),
+          pol: params.polCode || t("search.allPorts"),
+          pod: params.podCode || t("search.allPorts"),
+        }),
+      );
+    }
+  };
+
+  const handleReset = () => {
+    setSearchParams(DEFAULT_SEARCH_PARAMS);
+    setHasSearched(false);
+  };
+
+  const handleSearchModeChange = (nextMode: RateSearchMode) => {
+    setSearchParams((prev) => ({ ...prev, searchMode: nextMode }));
+    setHasSearched(false);
+  };
+
+  const handleBookNow = (rate: CombinedRateItem) => {
+    toast.success(
+      t("toasts.bookSelected", {
+        code: rate.code,
+        currency: rate.currency,
+        amount: rate.totalEstimatedAmount.toFixed(2),
+      }),
+    );
+    navigate({ to: "/app/schedules" });
+  };
+
+  const handleViewSurcharges = (rate: CombinedRateItem) => {
+    const dummyContract: ContractDTO = {
+      id: rate.id,
+      contractNo: rate.code,
+      customerCode: "CUST-APEX",
+      customerName: rate.title,
+      originPort: rate.originPort,
+      originPortName: rate.originPortName,
+      deliveryPort: rate.deliveryPort,
+      deliveryPortName: rate.deliveryPortName,
+      rateNo: "RAT-9901-A",
+      eqpType: rate.eqpType,
+      commodity: rate.commodity,
+      commodityName: rate.commodityName,
+      oceanFreight: rate.baseAmount,
+      currency: rate.currency,
+      subjectToChargesAmount: rate.surchargeAmount,
+      soc: rate.soc ?? "No",
+      carrTerms: rate.carrTerms ?? "CY / CY",
+      effectiveFrom: rate.effectiveFrom,
+      effectiveTo: rate.effectiveTo,
+      surcharges: rate.surcharges || surcharges,
+      transService: rate.transService,
+      nor: rate.nor,
+    };
+    setSelectedContract(dummyContract);
+    setSurchargeRate(rate);
+    setIsSurchargeModalOpen(true);
+  };
+
+  const handleCloseSurchargeModal = () => {
+    setIsSurchargeModalOpen(false);
+    setSurchargeRate(null);
+  };
+
+  const handleShareRate = (rate: CombinedRateItem) => {
+    setShareMailRates([rate]);
+    setIsShareMailOpen(true);
+  };
+
+  const handleBookFromSurcharge = () => {
+    if (!surchargeRate) return;
+    handleCloseSurchargeModal();
+    handleBookNow(surchargeRate);
+  };
+
+  const handleShareFromSurcharge = () => {
+    if (!surchargeRate) return;
+    handleCloseSurchargeModal();
+    handleShareRate(surchargeRate);
+  };
+
+  const handleShareResultsViaMail = () => {
+    if (cardRates.length === 0) {
+      toast.warning(t("errors.shareNoResults"));
+      return;
+    }
+    setShareMailRates(cardRates);
+    setIsShareMailOpen(true);
+  };
+
+  const handleCloseShareMail = () => {
+    setIsShareMailOpen(false);
+    setShareMailRates([]);
+  };
+
+  const handleRequestQuote = () => {
+    openQuoteDrawer({
+      originPort: searchParams.polCode,
+      deliveryPort: searchParams.podCode,
+      eqpType: searchParams.eqpType,
+      commodity: searchParams.commodity,
+    });
+  };
+
+  /** After RFQ create: jump to Spot Quotes for that lane so the new quote appears at the top. */
+  const handleQuoteCreated = (quote: QuoteDTO) => {
+    setSearchParams({
+      searchMode: "SPOT_QUOTES",
+      polCode: quote.originPort,
+      podCode: quote.deliveryPort,
+      eqpType: quote.eqpType || searchParams.eqpType,
+      commodity: quote.commodity || searchParams.commodity,
+    });
+    setHasSearched(true);
+  };
+
+  return {
+    viewMode,
+    setViewMode,
+    searchParams,
+    searchMode: searchParams.searchMode,
+    setSearchMode: (nextMode: RateSearchMode) => {
+      setSearchParams((prev) => ({ ...prev, searchMode: nextMode }));
+      setHasSearched(false);
+    },
+    resultsTitle: getResultsTitle(mode, t),
+    cardRates,
+    hasSearched,
+    isLoading,
+    handleSearch,
+    handleReset,
+    handleSearchModeChange,
+    handleBookNow,
+    handleViewSurcharges,
+    handleShareRate,
+    handleShareResultsViaMail,
+    handleRequestQuote,
+    selectedContract,
+    isSurchargeModalOpen,
+    handleCloseSurchargeModal,
+    handleBookFromSurcharge,
+    handleShareFromSurcharge,
+    isQuoteDrawerOpen,
+    quoteDefaults,
+    handleCloseQuoteDrawer: () => setIsQuoteDrawerOpen(false),
+    handleQuoteCreated,
+    isShareMailOpen,
+    shareMailRates,
+    handleCloseShareMail,
+  };
+}

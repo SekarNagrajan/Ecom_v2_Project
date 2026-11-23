@@ -1,0 +1,556 @@
+// Modified by Sekar Nagarajan (2026-11-13 03:20)
+
+import {
+  PRECONFIGURED_TENANTS,
+  useAuthStore,
+  usePermission,
+  useTenantStore,
+} from "@solverminds/auth";
+import { AppButton } from "@solverminds/shared-ui";
+import { useConfirm, useToast } from "@solverminds/shared-ui/hooks";
+import { useNavigate } from "@tanstack/react-router";
+import type { MenuProps } from "antd";
+import {
+  Avatar,
+  Dropdown,
+  Flex,
+  Layout,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+  theme,
+} from "antd";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { CustomerPickerModal } from "../../features/auth/components/customer-picker-modal";
+import { useImpersonationController } from "../../features/auth/hooks/use-impersonation-controller";
+import { ContactUsDrawer } from "../../features/contact-us/components/ContactUsDrawer";
+import { useProfilePhoto } from "../../features/profile-photo/providers/profile-photo-provider";
+import {
+  SCHEDULES_HEADER_SEARCH_SLOT_ID,
+  useSchedulesHeaderSearchStore,
+} from "../../features/schedules/stores/schedules-header-search.store";
+import { useThemePreferences } from "../../features/theme/providers/theme-preferences-provider";
+import { ChangePasswordView } from "../../features/user-modules/components/ChangePasswordView";
+import { MyAlertsView } from "../../features/user-modules/components/MyAlertsView";
+import { ProfileView } from "../../features/user-modules/components/ProfileView";
+import { isMockMode } from "../../data-source";
+import { AppIcon, Icons } from "../icons";
+import { AccountPreferencesDrawer } from "./account-preferences-drawer";
+import { HeaderLanguageSelect } from "./header-language-select";
+import { HeaderNotificationsCenter } from "./header-notifications-center";
+
+const { Header } = Layout;
+const { Text } = Typography;
+
+interface AuthenticatedLayoutHeaderProps {
+  onLogout: () => void;
+  compactHeader?: boolean;
+  onMobileMenuOpen?: () => void;
+  showMobileMenu?: boolean;
+  /** Guest browsing public /app search modules (schedules/tracking/rates). */
+  isGuest?: boolean;
+  onLoginClick?: () => void;
+}
+
+export function AuthenticatedLayoutHeader({
+  onLogout,
+  compactHeader = false,
+  onMobileMenuOpen,
+  showMobileMenu = false,
+  isGuest = false,
+  onLoginClick,
+}: AuthenticatedLayoutHeaderProps) {
+  const { t } = useTranslation("common");
+  const { token: themeToken } = theme.useToken();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { photoUrl } = useProfilePhoto();
+  const user = useAuthStore((state) => state.user);
+  const { isImpersonating: isImpersonatingFn } = usePermission();
+  const setActiveSubCustomer = useAuthStore((state) => state.setActiveSubCustomer);
+
+  const { activeTenant, setTenant } = useTenantStore();
+
+  const impersonation = useImpersonationController();
+
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [changePasswordDrawerOpen, setChangePasswordDrawerOpen] = useState(false);
+  const [myAlertDrawerOpen, setMyAlertDrawerOpen] = useState(false);
+  const [contactUsDrawerOpen, setContactUsDrawerOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const goHome = () => {
+    navigate({ to: "/" });
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  const handleLogoutConfirm = () => {
+    confirm.danger({
+      title: t("account.confirmLogoutTitle"),
+
+      content: t("account.confirmLogoutContent"),
+      okText: t("account.confirmLogoutOk"),
+      cancelText: t("actions.cancel"),
+      onOk: () => {
+        onLogout();
+      },
+    });
+  };
+
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const preferencesController = useThemePreferences();
+  const schedulesSearchActive = useSchedulesHeaderSearchStore((state) => state.active);
+
+  // Cpanel system admin — customer-scope only (not dual tenant + customer pickers)
+  const isCpanelAdmin = user?.adminUserType === "A" && user?.loginType === "V";
+
+  // Guest on public search modules: Login/Register chrome — not a fake logged-in user bar
+  if (isGuest || !user) {
+    return (
+      <Header className="app-layout-header">
+        <div className="app-layout-header__left">
+          {showMobileMenu ? (
+            <Tooltip title={t("nav.openNavigationMenu")}>
+              <AppButton
+                type="text"
+                icon={<AppIcon icon={Icons.menu} size={18} />}
+                onClick={onMobileMenuOpen}
+                aria-label={t("nav.openNavigationMenu")}
+              />
+            </Tooltip>
+          ) : null}
+          <Tooltip title={t("header.goToHome")}>
+            <button
+              type="button"
+              className="app-header-brand-home"
+              onClick={goHome}
+              aria-label={t("header.goToHome")}
+            >
+              <div className="app-header-brand-detail">
+                <div className="app-layout-header__brand-row">
+                  <Text strong className="app-layout-header__tenant-name">
+                    {t("appName")}
+                  </Text>
+                </div>
+                {/* <Text type="secondary" className="app-layout-header__welcome">
+                  Browse schedules, tracking, and rates — sign in for more
+                  modules
+                </Text> */}
+              </div>
+            </button>
+          </Tooltip>
+        </div>
+
+        {/* Modified by Sekar Nagarajan (2026-09-17 21:10) — middle slot avoids flex gaps */}
+        {schedulesSearchActive ? (
+          <div id={SCHEDULES_HEADER_SEARCH_SLOT_ID} className="app-header-schedules-search-slot" />
+        ) : null}
+
+        <div className="app-header-actions">
+          <Tooltip title={t("header.goToHome")}>
+            <AppButton
+              type="text"
+              className="app-header-action"
+              icon={<AppIcon icon={Icons.home} size={16} />}
+              onClick={goHome}
+              aria-label={t("header.home")}
+            >
+              {t("header.home")}
+            </AppButton>
+          </Tooltip>
+          <Tooltip title={t("header.contactUs")}>
+            <AppButton
+              type="text"
+              className="app-header-action"
+              icon={<AppIcon icon={Icons.headphones} size={16} />}
+              onClick={() => navigate({ to: "/contact-us" })}
+              aria-label={t("header.contactUs")}
+            >
+              {t("header.contactUs")}
+            </AppButton>
+          </Tooltip>
+          <Tooltip title={t("header.register")}>
+            <AppButton
+              type="text"
+              className="app-header-action"
+              icon={<AppIcon icon={Icons.userPlus} size={16} />}
+              onClick={() => navigate({ to: "/register" })}
+              aria-label={t("header.register")}
+            >
+              {t("header.register")}
+            </AppButton>
+          </Tooltip>
+          {/* <HeaderThemeToggle /> */}
+          <Tooltip title={t("header.login")}>
+            <AppButton
+              type="primary"
+              className="app-header-action app-header-action--primary"
+              icon={<AppIcon icon={Icons.logIn} size={16} />}
+              onClick={onLoginClick}
+              aria-label={t("header.login")}
+            >
+              {t("header.login")}
+            </AppButton>
+          </Tooltip>
+          <HeaderLanguageSelect buttonClassName="app-header-action" />
+        </div>
+      </Header>
+    );
+  }
+
+  const handleMenuClick: MenuProps["onClick"] = (info) => {
+    switch (info.key) {
+      case "profile":
+        setProfileDrawerOpen(true);
+        break;
+      case "appearance":
+      case "preferences":
+        setPreferencesOpen(true);
+        break;
+      case "change-password":
+        setChangePasswordDrawerOpen(true);
+        break;
+      case "contact-us":
+        setContactUsDrawerOpen(true);
+        break;
+      case "quote":
+        navigate({ to: "/app/quotes" as any });
+        break;
+      case "my-alert":
+        setMyAlertDrawerOpen(true);
+        break;
+      case "payment-history":
+        navigate({ to: "/app/payments" as any });
+        break;
+      case "user-creation":
+        navigate({ to: "/app/user-creation" });
+        break;
+      default:
+        break;
+    }
+  };
+
+  const userNameDisplay = user?.name || user?.email || "";
+  const userRoleDisplay = user?.isImpersonating
+    ? t("account.roles.adminImpersonation")
+    : user?.role === "ADMIN" && user?.adminUserType === "A"
+      ? t("account.roles.systemAdministrator")
+      : user?.role === "VENDOR"
+        ? t("account.roles.agencyAdministrator")
+        : user?.isSessionAdmin
+          ? t("account.roles.superuser")
+          : t("account.roles.customerAccount");
+  const initials = userNameDisplay
+    ? userNameDisplay
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "";
+
+  const subCustomerAccounts = user?.subCustomerAccounts || [
+    { custCode: "CUST-001", compName: "Apex Logistics Global" },
+    { custCode: "CUST-002", compName: "Atlantic Freight LLC" },
+    { custCode: "CUST-003", compName: "Pacific Maritime Corp" },
+  ];
+
+  const profileMenuItems: MenuProps["items"] = [
+    {
+      key: "profile",
+      label: t("account.profile"),
+      icon: <AppIcon icon={Icons.user} size={16} />,
+    },
+    {
+      key: "appearance",
+      label: t("account.accessibilityControls"),
+      icon: <AppIcon icon={Icons.palette} size={16} />,
+    },
+    {
+      key: "change-password",
+      label: t("account.changePassword"),
+      icon: <AppIcon icon={Icons.key} size={16} />,
+    },
+    {
+      key: "contact-us",
+      label: t("account.contactUs"),
+      icon: <AppIcon icon={Icons.headphones} size={16} />,
+    },
+    {
+      key: "quote",
+      label: t("account.quote"),
+      icon: <AppIcon icon={Icons.dollarSign} size={16} />,
+    },
+    {
+      key: "my-alert",
+      label: t("account.myAlert"),
+      icon: <AppIcon icon={Icons.bell} size={16} />,
+    },
+    // {
+    //   key: "payment-history",
+    //   label: "Payment History",
+    //   icon: <AppIcon icon={Icons.landmark} size={16} />,
+    // },
+    ...(user?.isSessionAdmin || user?.role === "ADMIN"
+      ? [
+          {
+            key: "user-creation",
+            label: t("account.subUserCreation"),
+            icon: <AppIcon icon={Icons.userPlus} size={16} />,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <>
+      {isImpersonatingFn() && user?.impersonatedCustomer ? (
+        <Flex
+          align="center"
+          justify="space-between"
+          style={{
+            background: themeToken.colorWarningBg,
+            borderBottom: `1px solid ${themeToken.colorWarningBorder}`,
+            padding: `${themeToken.paddingXS}px ${themeToken.paddingLG}px`,
+          }}
+        >
+          <Space size="small">
+            <AppIcon icon={Icons.userCog} size={16} style={{ color: themeToken.colorWarning }} />
+            <Text strong>
+              {t("header.actingAs", {
+                name: user.impersonatedCustomer.compName,
+                code: user.impersonatedCustomer.custCode,
+              })}
+            </Text>
+          </Space>
+          <Space size="small">
+            <AppButton
+              size="small"
+              onClick={() => impersonation.setShowPicker(true)}
+              icon={<AppIcon icon={Icons.users} size={14} />}
+            >
+              {t("header.switchCustomer")}
+            </AppButton>
+            <AppButton
+              size="small"
+              danger
+              loading={impersonation.isExiting}
+              onClick={impersonation.handleExitImpersonation}
+              icon={<AppIcon icon={Icons.logOut} size={14} />}
+            >
+              {t("header.exitImpersonation")}
+            </AppButton>
+          </Space>
+        </Flex>
+      ) : null}
+
+      <Header className="app-layout-header">
+        <div className="app-layout-header__left">
+          {showMobileMenu ? (
+            <Tooltip title={t("nav.openNavigationMenu")}>
+              <AppButton
+                type="text"
+                icon={<AppIcon icon={Icons.menu} size={18} />}
+                onClick={onMobileMenuOpen}
+                aria-label={t("nav.openNavigationMenu")}
+              />
+            </Tooltip>
+          ) : null}
+          <div className="app-header-brand-detail">
+            <div className="app-layout-header__brand-row">
+              <Text strong className="app-layout-header__tenant-name">
+                {activeTenant.name}
+              </Text>
+
+              {user?.isSessionAdmin && !user?.isImpersonating ? (
+                <Tag
+                  icon={<AppIcon icon={Icons.crown} size={16} />}
+                  color="gold"
+                  className="app-header-tag"
+                >
+                  {t("header.superuserActive")}
+                </Tag>
+              ) : null}
+              {user?.isImpersonating ? (
+                <Tag
+                  icon={<AppIcon icon={Icons.userCog} size={16} />}
+                  color="orange"
+                  className="app-header-tag"
+                >
+                  {t("header.impersonating")}
+                </Tag>
+              ) : null}
+            </div>
+            {/* <Text type="secondary" className="app-layout-header__welcome">
+              Welcome to E-COM PORTAL
+            </Text> */}
+          </div>
+        </div>
+
+        {/* Modified by Sekar Nagarajan (2026-09-17 21:10) — middle slot avoids flex gaps */}
+        {schedulesSearchActive ? (
+          <div id={SCHEDULES_HEADER_SEARCH_SLOT_ID} className="app-header-schedules-search-slot" />
+        ) : null}
+
+        <div className="app-header-actions">
+          {/* Customer scope: superuser / cpanel default-customer list / sub-accounts */}
+          {(user?.isSessionAdmin ||
+            isCpanelAdmin ||
+            (user?.subCustomerAccounts && user.subCustomerAccounts.length > 0 && !isCpanelAdmin)) &&
+          !compactHeader &&
+          (user?.subCustomerAccounts?.length ?? 0) > 0 ? (
+            <Space size={4} align="center">
+              <AppIcon icon={Icons.users} size={16} />
+              <Select
+                value={user?.activeSubCustomer || subCustomerAccounts[0]?.custCode}
+                onChange={(val) => {
+                  setActiveSubCustomer(val);
+                  const match = subCustomerAccounts.find((a) => a.custCode === val);
+                  toast.success(
+                    t("header.switchedCustomerScope", {
+                      name: match ? match.compName : val,
+                    }),
+                  );
+                }}
+                className="app-header-select"
+                options={subCustomerAccounts.map((a) => ({
+                  value: a.custCode,
+                  label: `${a.custCode} - ${a.compName}`,
+                }))}
+              />
+            </Space>
+          ) : null}
+
+          {/* Tenant switcher (demo presets): ADMIN only, mock mode only — the real backend derives the tenant from the host */}
+          {isMockMode() && user?.role === "ADMIN" && !isCpanelAdmin && !compactHeader ? (
+            <Space size={4} align="center">
+              <AppIcon icon={Icons.layoutGrid} size={16} />
+              <Select
+                value={activeTenant.id}
+                onChange={(val) => {
+                  setTenant(val);
+                  toast.info(
+                    t("header.switchedTenant", {
+                      name: PRECONFIGURED_TENANTS[val]?.name,
+                    }),
+                  );
+                }}
+                className="app-header-select"
+                options={Object.values(PRECONFIGURED_TENANTS).map((t) => ({
+                  value: t.id,
+                  label: `${t.customerCode} - ${t.name}`,
+                }))}
+              />
+            </Space>
+          ) : null}
+
+          {/* <HeaderThemeToggle /> */}
+
+          <HeaderLanguageSelect buttonClassName="app-header-action" />
+
+          <Tooltip title={isFullscreen ? t("header.exitFullscreen") : t("header.enterFullscreen")}>
+            <AppButton
+              type="text"
+              shape="circle"
+              icon={
+                isFullscreen ? (
+                  <AppIcon icon={Icons.minimize} size={16} />
+                ) : (
+                  <AppIcon icon={Icons.expand} size={16} />
+                )
+              }
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? t("header.exitFullscreen") : t("header.enterFullscreen")}
+            />
+          </Tooltip>
+
+          {!isGuest ? (
+            <HeaderNotificationsCenter onOpenPreferences={() => setMyAlertDrawerOpen(true)} />
+          ) : null}
+
+          <div className="app-header-user-cluster">
+            <Dropdown
+              trigger={["click"]}
+              menu={{ items: profileMenuItems, onClick: handleMenuClick }}
+              placement="bottomRight"
+            >
+              <button
+                type="button"
+                className="app-header-user-trigger"
+                aria-label={t("header.openAccountMenu")}
+              >
+                <Avatar className="app-header-avatar" size="default" src={photoUrl ?? undefined}>
+                  {photoUrl ? null : initials}
+                </Avatar>
+                <div className="app-header-user-meta">
+                  <Text strong className="app-header-user-name">
+                    {userNameDisplay}
+                  </Text>
+                  <Text type="secondary" className="app-header-user-role">
+                    {userRoleDisplay}
+                  </Text>
+                </div>
+              </button>
+            </Dropdown>
+
+            <Tooltip title={t("header.logout")}>
+              <AppButton
+                type="text"
+                shape="circle"
+                className="app-header-logout"
+                icon={<AppIcon icon={Icons.logOut} size={20} tone="reject" />}
+                onClick={handleLogoutConfirm}
+                aria-label={t("header.logout")}
+              />
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Account Profile Drawer */}
+        <ProfileView open={profileDrawerOpen} onClose={() => setProfileDrawerOpen(false)} />
+
+        {/* Change Password Drawer */}
+        <ChangePasswordView
+          open={changePasswordDrawerOpen}
+          onClose={() => setChangePasswordDrawerOpen(false)}
+        />
+
+        {/* My Alert Preferences Drawer */}
+        <MyAlertsView open={myAlertDrawerOpen} onClose={() => setMyAlertDrawerOpen(false)} />
+
+        {/* Global Contact Us Drawer */}
+        <ContactUsDrawer open={contactUsDrawerOpen} onClose={() => setContactUsDrawerOpen(false)} />
+
+        {/* Theme & Appearance Customization Panel */}
+        <AccountPreferencesDrawer
+          open={preferencesOpen}
+          onClose={() => setPreferencesOpen(false)}
+          preferencesController={preferencesController}
+        />
+      </Header>
+
+      {/* Customer Picker Modal for impersonation switching */}
+      <CustomerPickerModal
+        open={impersonation.showPicker}
+        customerList={impersonation.customerList}
+        onSelect={impersonation.handleSelectCustomer}
+        onCancel={() => impersonation.setShowPicker(false)}
+      />
+    </>
+  );
+}

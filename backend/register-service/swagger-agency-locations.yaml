@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: ECOM API Service - Agency Locations
+  description: |
+    Agency Locations API provides access to port and agency code information from the reportdb database.
+    
+    This endpoint returns all available agency locations with optional filtering capabilities.
+    The system uses a fallback query mechanism to ensure data availability.
+  version: 1.0.0
+  contact:
+    name: ECOM API Team
+    email: api-support@company.com
+  license:
+    name: Proprietary
+    url: https://company.com/license
+
+servers:
+  - url: https://api.company.com/ecomapi-service
+    description: Production server
+  - url: https://api-uat.company.com/ecomapi-service
+    description: UAT server
+  - url: https://api-dev.company.com/ecomapi-service
+    description: Development server
+
+tags:
+  - name: Registration Services
+    description: Registration-related operations including agency location lookup
+
+paths:
+  /api/v1/register/agency-locations:
+    get:
+      tags:
+        - Registration Services
+      summary: List all agency locations (ports with agency codes)
+      description: |
+        Returns all distinct ports and agency codes from the reportdb database.
+        
+        **Query Logic:**
+        1. Tries primary query joining ports, agency, and agencylocations tables
+        2. If primary query returns 0 rows, falls back to simplified query without agencylocations table
+        3. Results are automatically deduplicated by (portCode, agencyCode) combination
+        
+        **Features:**
+        - No authentication required (public endpoint)
+        - Complete dataset returned (no pagination)
+        - Read-only access to reportdb
+        
+      responses:
+        '200':
+          description: Operation completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgencyLocationListResponse'
+              examples:
+                successWithResults:
+                  summary: All locations returned
+                  value:
+                    data:
+                      - portCode: "INNSA"
+                        portName: "Nhava Sheva"
+                        agencyCode: "INDMUM"
+                      - portCode: "AEJEA" 
+                        portName: "Jebel Ali"
+                        agencyCode: "AEJEA1"
+                      - portCode: "INBOM"
+                        portName: "Mumbai"
+                        agencyCode: "INBOM1"
+                successEmptyResults:
+                  summary: No locations found
+                  value:
+                    data: []
+                    
+        '500':
+          description: Internal Server Error - An unexpected error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                databaseConnectionError:
+                  summary: Database connection failure
+                    value:
+                      statusCode: 500
+                      statusCodeText: "Internal Server Error"
+                      errorDateTime: "2025-09-15T12:45:12Z"
+                      errors:
+                        - errorCode: 1000
+                          field: null
+                          value: null
+                          reason: "apiError"
+                          message: "Failed to fetch agency locations: Could not connect to reportdb"
+                generalInternalError:
+                  summary: General system error
+                  value:
+                    statusCode: 500
+                    statusCodeText: "Internal Server Error"
+                    errorDateTime: "2025-09-15T12:45:12Z"
+                    errors:
+                      - errorCode: 1000
+                        field: null
+                        value: null
+                        reason: "internalError"
+                        message: "An unexpected error occurred while processing the request"
+
+components:
+  schemas:
+    AgencyLocationListResponse:
+      type: object
+      description: Response containing all agency locations
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          description: List of all agency locations
+          items:
+            $ref: '#/components/schemas/AgencyLocationDTO'
+      example:
+        data:
+          - portCode: "INNSA"
+            portName: "Nhava Sheva"
+            agencyCode: "INDMUM"
+          - portCode: "AEJEA"
+            portName: "Jebel Ali"
+            agencyCode: "AEJEA1"
+
+    AgencyLocationDTO:
+      type: object
+      description: Agency location with port and agency information
+      required:
+        - portCode
+        - portName
+        - agencyCode
+      properties:
+        portCode:
+          type: string
+          description: Port code identifier
+          example: "INNSA"
+          maxLength: 10
+        portName:
+          type: string
+          description: Full name of the port
+          example: "Nhava Sheva"
+          maxLength: 100
+        agencyCode:
+          type: string
+          description: Agency code for this location
+          example: "INDMUM"
+          maxLength: 10
+      example:
+        portCode: "INNSA"
+        portName: "Nhava Sheva"
+        agencyCode: "INDMUM"
+
+    ErrorResponse:
+      type: object
+      description: Standard error wrapper for API failures
+      required:
+        - statusCode
+        - statusCodeText
+        - errorDateTime
+        - errors
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 500
+        statusCodeText:
+          type: string
+          description: HTTP status text
+          example: "Internal Server Error"
+        errorDateTime:
+          type: string
+          format: date-time
+          description: When the error occurred
+          example: "2025-09-15T12:45:12Z"
+        errors:
+          type: array
+          description: List of error details
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+            
+    ErrorDetail:
+      type: object
+      description: Single error item
+      required:
+        - errorCode
+        - reason
+        - message
+      properties:
+        errorCode:
+          type: integer
+          description: Integer error code
+          example: 1000
+        field:
+          type: string
+          nullable: true
+          description: Field name (when applicable)
+          example: null
+        value:
+          type: string
+          nullable: true
+          description: Rejected value (when applicable)
+          example: null
+        reason:
+          type: string
+          description: Type of error
+          enum:
+            - validationError
+            - badRequest
+            - unauthorized
+            - forbidden
+            - businessRule
+            - internalError
+            - methodNotAllowed
+            - unsupportedMediaType
+            - serviceUnavailable
+            - apiError
+          example: "apiError"
+        message:
+          type: string
+          description: Error message description
+          example: "Failed to fetch agency locations: Could not connect to reportdb"
+
+  examples:
+    AgencyLocationExample:
+      summary: Sample agency location
+      value:
+        portCode: "INNSA"
+        portName: "Nhava Sheva"
+        agencyCode: "INDMUM"
+
+# Security: This endpoint is public and does not require authentication
+security: []

@@ -1,0 +1,98 @@
+package com.svm.ecom.infrastructure.user;
+
+import com.svm.ecom.domain.user.UserPermission;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+/**
+ * Repository interface for managing UserPermission entities.
+ * Provides methods to query user permissions from the database.
+ */
+@Repository
+public interface UserPermissionRepository extends JpaRepository<UserPermission, Long> {
+
+    /**
+     * Find all permissions for a specific user
+     */
+    List<UserPermission> findByUsernameAndEnabled(String username, Boolean enabled);
+
+    /**
+     * Find all enabled permissions for a specific user
+     */
+    default List<UserPermission> findByUsername(String username) {
+        return findByUsernameAndEnabled(username, true);
+    }
+
+    /**
+     * Find endpoint permissions for a specific user
+     */
+    @Query("SELECT up FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'endpoint' AND up.enabled = true")
+    List<UserPermission> findEndpointPermissionsByUsername(@Param("username") String username);
+
+    /**
+     * Find swagger group permissions for a specific user
+     */
+    @Query("SELECT up FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'swagger_group' AND up.enabled = true")
+    List<UserPermission> findSwaggerGroupPermissionsByUsername(@Param("username") String username);
+
+    /**
+     * Check if user has a specific endpoint permission
+     */
+    @Query("SELECT up FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'endpoint' AND (up.permissionValue = :endpoint OR up.permissionValue = '*') AND up.enabled = true")
+    List<UserPermission> findEndpointPermissionMatch(@Param("username") String username, @Param("endpoint") String endpoint);
+
+    /**
+     * Check if user has a specific swagger group permission
+     */
+    @Query("SELECT up FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'swagger_group' AND (up.permissionValue = :swaggerGroup OR up.permissionValue = '*') AND up.enabled = true")
+    List<UserPermission> findSwaggerGroupPermissionMatch(@Param("username") String username, @Param("swaggerGroup") String swaggerGroup);
+
+    /**
+     * Get all endpoint permission values for a user
+     */
+    @Query("SELECT up.permissionValue FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'endpoint' AND up.enabled = true")
+    List<String> getEndpointPermissions(@Param("username") String username);
+
+    /**
+     * Get all swagger group permission values for a user
+     */
+    @Query("SELECT up.permissionValue FROM UserPermission up WHERE up.username = :username AND up.permissionType = 'swagger_group' AND up.enabled = true")
+    List<String> getSwaggerGroupPermissions(@Param("username") String username);
+
+    /**
+     * Delete all permissions for a user (for updating permissions)
+     */
+    void deleteByUsername(String username);
+
+    /**
+     * Delete specific permission for a user
+     */
+    void deleteByUsernameAndPermissionTypeAndPermissionValue(String username, String permissionType, String permissionValue);
+
+    /**
+     * Find all users with a specific permission
+     */
+    @Query("SELECT DISTINCT up.username FROM UserPermission up WHERE up.permissionType = :permissionType AND up.permissionValue = :permissionValue AND up.enabled = true")
+    List<String> findUsersWithPermission(@Param("permissionType") String permissionType, @Param("permissionValue") String permissionValue);
+
+    /**
+     * Get all distinct usernames that have permissions
+     */
+    @Query("SELECT DISTINCT up.username FROM UserPermission up WHERE up.enabled = true")
+    List<String> findAllUsersWithPermissions();
+
+    /**
+     * Convenience methods for permission checking
+     */
+    default boolean hasEndpointPermission(String username, String endpoint) {
+        return !findEndpointPermissionMatch(username, endpoint).isEmpty();
+    }
+
+    default boolean hasSwaggerGroupPermission(String username, String swaggerGroup) {
+        return !findSwaggerGroupPermissionMatch(username, swaggerGroup).isEmpty();
+    }
+}

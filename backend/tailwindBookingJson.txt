@@ -1,0 +1,94 @@
+{
+  "originPortId": "CNNGB",
+  "finalPortId": "ESBCN",
+  "loadPortId": "CNNGB",
+  "dischargePortId": "ESBCN",
+  "cargoReadyDate": "2025-12-12",
+  "preCarriage": "N",
+  "onCarriage": "N",
+  "status": "S",
+  "customerCode": "2022000001",
+  "routeId": 5,
+  "oceanFreight": "P",
+  "isAmendment": "N",
+  "ensFilling": "S",
+  "t2lFilling": "N",
+  "ensType": "S",
+  "customers": [
+    {
+      "customerType": "BP",
+      "customerCode": "2022000001",
+      "countryId": "DE",
+      "customerName": "LIDL EMB KG",
+      "address": "Stiftsbergstraße 1 ·D-74172",
+      "city": "Neckarsulm",
+      "zipCode": "",
+      "telephone": "49-7132-942220",
+      "email": ""
+    },
+    {
+      "customerType": "AP",
+      "customerCode": "2022000001",
+      "countryId": "DE",
+      "customerName": "LIDL EMB KG",
+      "address": "Stiftsbergstraße 1 ·D-74172",
+      "city": "Neckarsulm",
+      "zipCode": "",
+      "telephone": "49-7132-942220",
+      "email": ""
+    }
+  ],
+  "containers": [
+    {
+      "cargoNo": 1,
+      "oogFlag": "N",
+      "equipmentQty": 1,
+      "equipmentType": "D",
+      "equipmentSize": "20DC",
+      "socFlag": "N",
+      "dgFlag": "N",
+      "equipmentStatus": "F",
+      "cargoWeight": 1000,
+      "weightUnit": "K",
+      "nor": "N",
+      "containerNo": "20DCTBN1"
+    }
+  ],
+  "commodities": [
+    {
+      "cargoNo": 1,
+      "containerNo": "20DCTBN1",
+      "itemNo": 1,
+      "commodityGroup": 90,
+      "hsCode": "",
+      "packageType": "PACK",
+      "packageQty": 1,
+      "cargoVolume": 100,
+      "volumnUnit": "M",
+      "nettwt": 0,
+      "commodityHBLNo": ""
+    }
+  ],
+  "routes": [
+    {
+      "legNo": 1,
+      "loadBound": "W",
+      "serviceCode": "PAX",
+      "vesselCode": "P07",
+      "voyageCode": "526",
+      "serviceType": "M",
+      "loadPortId": "CNNGB",
+      "loadTerminal": "CNNGBCTT00",
+      "dischargePortId": "ESBCN",
+      "dischargeTerminal": "ESBCNHPB00",
+      "etdDate": "2025-12-24 06:30:00",
+      "etaDate": "2026-01-26 23:30:00",
+      "loadType": "L",
+      "dischType": "L",
+      "groupCallId": "GrpCall-6700",
+      "dischargeCallId": "GrpCall-6703",
+      "loadCallId": "GrpCall-6700",
+      "dischargeBound": "W"
+    }
+  ]
+}

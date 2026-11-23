@@ -1,0 +1,41 @@
+/* CSS to completely hide servers dropdown and related elements */
+
+/* Hide the main servers section */
+.swagger-ui .servers {
+    display: none !important;
+}
+
+/* Hide servers wrapper */
+.swagger-ui .servers-wrapper {
+    display: none !important;
+}
+
+/* Hide scheme container */
+.swagger-ui .scheme-container {
+    display: none !important;
+}
+
+/* Hide servers title */
+.swagger-ui .servers-title {
+    display: none !important;
+}
+
+/* Hide any select elements related to servers */
+.swagger-ui .servers select {
+    display: none !important;
+}
+
+/* Hide any div with class containing "servers" */
+.swagger-ui div[class*="servers"] {
+    display: none !important;
+}
+
+/* Hide any server-related labels */
+.swagger-ui label[for*="server"] {
+    display: none !important;
+}
+
+/* General cleanup - hide any element with "server" in data attributes */
+.swagger-ui [data-name*="server"] {
+    display: none !important;
+}

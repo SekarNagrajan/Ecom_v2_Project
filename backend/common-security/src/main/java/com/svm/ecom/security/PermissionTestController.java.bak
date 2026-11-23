@@ -1,0 +1,67 @@
+package com.svm.ecom.security;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Test controller to demonstrate table-driven permissions
+ * This controller is for testing and debugging purposes only
+ */
+@RestController
+@RequestMapping("/api/v1/permissions")
+public class PermissionTestController {
+
+    @Autowired
+    private PermissionService permissionService;
+
+    @GetMapping("/test")
+    public ResponseEntity<Map<String, Object>> testPermissions() {
+        Map<String, Object> response = new HashMap<>();
+        
+        String currentUser = permissionService.getCurrentUsername();
+        response.put("currentUser", currentUser != null ? currentUser : "anonymous");
+        
+        // Test endpoint permissions
+        response.put("canAccessSchedule", permissionService.canAccessSchedule());
+        response.put("canAccessTracking", permissionService.canAccessTracking());
+        
+        // Test Swagger group visibility
+        response.put("canViewScheduleApiGroup", permissionService.canViewSwaggerGroup("schedule-api"));
+        response.put("canViewTrackingApiGroup", permissionService.canViewSwaggerGroup("tracking-api"));
+        response.put("canViewEcomApiGroup", permissionService.canViewSwaggerGroup("ecom-api"));
+        
+        // Get full user permissions if available
+        if (currentUser != null) {
+            Map<String, Object> userPermissions = new HashMap<>();
+            userPermissions.put("endpoints", permissionService.getUserEndpointPermissions(currentUser));
+            userPermissions.put("swaggerGroups", permissionService.getUserSwaggerGroupPermissions(currentUser));
+            response.put("userPermissions", userPermissions);
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/test/specific-endpoint")
+    public ResponseEntity<Map<String, Object>> testSpecificEndpoints() {
+        Map<String, Object> response = new HashMap<>();
+        
+        String currentUser = permissionService.getCurrentUsername();
+        response.put("currentUser", currentUser != null ? currentUser : "anonymous");
+        
+        // Test various endpoint permissions
+        response.put("hasSchedulePermission", permissionService.hasEndpointPermission("schedule"));
+        response.put("hasTrackingPermission", permissionService.hasEndpointPermission("tracking"));
+        response.put("hasVesselPermission", permissionService.hasEndpointPermission("vessel"));
+        response.put("hasPortPermission", permissionService.hasEndpointPermission("port"));
+        response.put("hasWildcardPermission", permissionService.hasEndpointPermission("*"));
+        
+        return ResponseEntity.ok(response);
+    }
+}

@@ -1,0 +1,89 @@
+// Modified by Sekar Nagarajan (2026-08-26 14:57)
+import { useToast } from "@solverminds/shared-ui/hooks";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import { croApi } from "./cro.api";
+import { croKeys } from "./cro.keys";
+
+export function useCROSummaryQuery(fromDate?: string, toDate?: string) {
+  const { t } = useTranslation("container-release-order");
+
+  return useQuery({
+    queryKey: croKeys.list(fromDate, toDate),
+    queryFn: async () => {
+      const res = await croApi.fetchList({ fromDate, toDate });
+      if (res.error) {
+        throw new Error(res.error.message || t("errors.fetchList"));
+      }
+      return res.data ?? [];
+    },
+  });
+}
+
+export function useCRODetailQuery(croNo: string | null) {
+  const { t } = useTranslation("container-release-order");
+
+  return useQuery({
+    queryKey: croKeys.detail(croNo ?? ""),
+    enabled: Boolean(croNo),
+    queryFn: async () => {
+      if (!croNo) return null;
+      const res = await croApi.fetchDetail(croNo);
+      if (res.error) {
+        throw new Error(res.error.message || t("errors.fetchDetail"));
+      }
+      return res.data ?? null;
+    },
+  });
+}
+
+export function useCROEligibilityQuery(bookingNo: string | null) {
+  const { t } = useTranslation("container-release-order");
+
+  return useQuery({
+    queryKey: croKeys.eligibility(bookingNo ?? ""),
+    enabled: Boolean(bookingNo),
+    queryFn: async () => {
+      if (!bookingNo) return null;
+      const res = await croApi.fetchEligibility(bookingNo);
+      if (res.error) {
+        throw new Error(res.error.message || t("errors.fetchEligibility"));
+      }
+      return res.data ?? null;
+    },
+  });
+}
+
+export function useCRODownloadMutation() {
+  const { t } = useTranslation("container-release-order");
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: async (croNo: string) => {
+      const res = await croApi.downloadDocument(croNo);
+      if (res.error) {
+        throw new Error(res.error.message || t("errors.download"));
+      }
+      return { blob: res.data, croNo };
+    },
+    onSuccess: ({ blob, croNo }) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), {
+        href: url,
+        download: `${croNo}.pdf`,
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+
+      queryClient.invalidateQueries({ queryKey: croKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: croKeys.detail(croNo) });
+      toast.success(t("toasts.documentDownloaded", { croNo }));
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}

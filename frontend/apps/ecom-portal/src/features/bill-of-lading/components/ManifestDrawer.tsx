@@ -1,0 +1,255 @@
+// Modified by Sekar Nagarajan (2026-08-31 15:20)
+import { AppButton, AppDrawer } from "@solverminds/shared-ui";
+import { Radio, Tag, Typography } from "antd";
+import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import {
+  AppIcon,
+  Icons,
+  NavBillOfLadingIcon,
+  NavBookingIcon,
+} from "../../../components/icons";
+import { ModuleEmptyState } from "../../../components/shared/module-empty-state";
+import { formatModuleScreenTitle } from "../../../constants/module-titles";
+import { useMCNDetailQuery, useMCNPrintMutation } from "../api/bl.queries";
+import type { MCNDTO } from "../types/bl.types";
+import { BlLoadingCenter } from "./bl-loading-center";
+
+const { Text, Title } = Typography;
+
+export interface ManifestDrawerProps {
+  open: boolean;
+  mcnId: string | null;
+  blNo?: string | null;
+  onClose: () => void;
+}
+
+function parsePortLabel(value: string) {
+  const parts = value.split(" - ");
+  if (parts.length < 2) {
+    return { code: value, name: value };
+  }
+  return {
+    code: parts[0]?.trim() || value,
+    name: parts.slice(1).join(" - ").trim() || value,
+  };
+}
+
+function statusTone(status: MCNDTO["status"]): {
+  color: string;
+  icon: LucideIcon;
+} {
+  if (status === "Confirmed")
+    return { color: "success", icon: Icons.badgeCheck };
+  if (status === "Submitted") return { color: "warning", icon: Icons.send };
+  return { color: "default", icon: Icons.clock };
+}
+
+function ManifestMetaItem({
+  icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bl-manifest-meta__item">
+      <div className="bl-manifest-meta__icon" aria-hidden>
+        <AppIcon icon={icon} size={16} />
+      </div>
+      <div className="bl-manifest-meta__content">
+        <span className="bl-manifest-meta__label">{label}</span>
+        <span className="bl-manifest-meta__value">{children}</span>
+      </div>
+    </div>
+  );
+}
+
+export function ManifestDrawer({
+  open,
+  mcnId,
+  blNo,
+  onClose,
+}: ManifestDrawerProps) {
+  const { t } = useTranslation(["bill-of-lading", "common", "modules"]);
+  const [manifestType, setManifestType] = useState<"cargo" | "freight">(
+    "cargo",
+  );
+  const { data: detail, isLoading } = useMCNDetailQuery(
+    mcnId ?? "",
+    Boolean(open && mcnId),
+  );
+  const { mutate: printMcn, isPending } = useMCNPrintMutation();
+
+  const loadPort = parsePortLabel(detail?.loadPort ?? "");
+  const dischargePort = parsePortLabel(detail?.dischargePort ?? "");
+  const status = detail ? statusTone(detail.status) : null;
+
+  return (
+    <AppDrawer
+      title={
+        <span className="bl-manifest-drawer-title">
+          <AppIcon icon={Icons.clipboardList} size={18} />
+          {formatModuleScreenTitle(
+            t("drawers.manifest"),
+            mcnId ?? blNo ?? undefined,
+          )}
+        </span>
+      }
+      open={open}
+      onClose={onClose}
+      width={720}
+      destroyOnClose
+      classNames={{ body: "bl-drawer-body custom-scroll" }}
+      footer={
+        <>
+          {detail ? (
+            <AppButton
+              type="primary"
+              icon={<AppIcon icon={Icons.printer} size={16} tone="print" />}
+              loading={isPending}
+              onClick={() =>
+                printMcn({
+                  mcnId: detail.mcnId,
+                  manifestType: manifestType === "cargo" ? "C" : "F",
+                })
+              }
+            >
+              {t("manifest.print")}
+            </AppButton>
+          ) : null}
+        </>
+      }
+    >
+      {!mcnId ? (
+        <ModuleEmptyState
+          variant="blank"
+          title={t("empty.noManifestLinkedTitle")}
+          message={t("empty.noManifestLinkedMessage")}
+          artSize="sm"
+        />
+      ) : isLoading ? (
+        <BlLoadingCenter />
+      ) : !detail ? (
+        <ModuleEmptyState
+          variant="error"
+          title={t("empty.manifestNotFoundTitle")}
+          message={t("empty.manifestNotFoundMessage", { mcnId })}
+          artSize="sm"
+        />
+      ) : status ? (
+        <>
+          <div className="bl-manifest-route">
+            <div className="bl-manifest-route__port bl-manifest-route__port--load">
+              <div className="bl-manifest-route__label">
+                <AppIcon icon={Icons.mapPin} size={14} tone="view" />
+                {t("columns.load")}
+              </div>
+              <Title
+                level={4}
+                className="bl-manifest-route__code bl-manifest-route__code--load"
+              >
+                {loadPort.code || "—"}
+              </Title>
+              {loadPort.name !== loadPort.code ? (
+                <Text className="bl-manifest-route__name">{loadPort.name}</Text>
+              ) : null}
+            </div>
+
+            <div className="bl-manifest-route__connector">
+              <span className="bl-manifest-route__connector-label">
+                {t("labels.voyage")}
+              </span>
+              <div className="bl-manifest-route__line">
+                <span className="bl-manifest-route__dot bl-manifest-route__dot--load" />
+                <span className="bl-manifest-route__track" />
+                <AppIcon icon={Icons.ship} size={16} />
+                <span className="bl-manifest-route__track" />
+                <span className="bl-manifest-route__dot bl-manifest-route__dot--discharge" />
+              </div>
+              <AppIcon icon={Icons.arrowRight} size={14} tone="navigate" />
+            </div>
+
+            <div className="bl-manifest-route__port bl-manifest-route__port--discharge">
+              <div className="bl-manifest-route__label">
+                <AppIcon icon={Icons.mapPin} size={14} tone="view" />
+                {t("columns.discharge")}
+              </div>
+              <Title
+                level={4}
+                className="bl-manifest-route__code bl-manifest-route__code--discharge"
+              >
+                {dischargePort.code || "—"}
+              </Title>
+              {dischargePort.name !== dischargePort.code ? (
+                <Text className="bl-manifest-route__name">
+                  {dischargePort.name}
+                </Text>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="bl-manifest-status">
+            <AppIcon icon={status.icon} size={16} />
+            <Text strong>{t("columns.status")}</Text>
+            <Tag color={status.color}>{detail.status}</Tag>
+          </div>
+
+          <div className="bl-manifest-type form-step-section">
+            <Text strong className="form-field-label">
+              {t("manifest.type")}
+            </Text>
+            <Radio.Group
+              value={manifestType}
+              onChange={(e) => setManifestType(e.target.value)}
+            >
+              <Radio value="cargo">{t("manifest.cargo")}</Radio>
+              <Radio value="freight">{t("manifest.freight")}</Radio>
+            </Radio.Group>
+          </div>
+
+          <div className="bl-manifest-meta">
+            <ManifestMetaItem icon={Icons.barcode} label={t("columns.mcnNo")}>
+              {detail.mcnId}
+            </ManifestMetaItem>
+            <ManifestMetaItem
+              icon={NavBillOfLadingIcon}
+              label={t("columns.blNo")}
+            >
+              {detail.blNo}
+            </ManifestMetaItem>
+            <ManifestMetaItem
+              icon={NavBookingIcon}
+              label={t("columns.bookingNo")}
+            >
+              {detail.bookingNo}
+            </ManifestMetaItem>
+            <ManifestMetaItem icon={Icons.ship} label={t("labels.vessel")}>
+              {detail.vessel}
+            </ManifestMetaItem>
+            <ManifestMetaItem icon={Icons.compass} label={t("labels.voyage")}>
+              {detail.voyage}
+            </ManifestMetaItem>
+            <ManifestMetaItem icon={Icons.boxes} label={t("labels.containers")}>
+              {detail.containerCount}
+            </ManifestMetaItem>
+          </div>
+
+          {detail.remarks ? (
+            <div className="bl-manifest-remarks">
+              <div className="bl-manifest-remarks__header">
+                <AppIcon icon={Icons.fileText} size={16} tone="view" />
+                <Text strong>{t("labels.remarks")}</Text>
+              </div>
+              <Text type="secondary">{detail.remarks}</Text>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </AppDrawer>
+  );
+}

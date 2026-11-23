@@ -1,0 +1,179 @@
+// Modified by Sekar Nagarajan (2026-09-04 23:45)
+import { AppButton } from "@solverminds/shared-ui";
+import { Card, Tooltip, Typography } from "antd";
+import type { ReactNode } from "react";
+
+import { AppIcon, Icons } from "../../../../components/icons";
+import {
+  ListActionButton,
+  ListActionsRow,
+} from "../../../../components/shared/list-action-button";
+import { useTranslation } from "react-i18next";
+import {
+  getPreviewPartyRoleLabel,
+  type PartyCardData,
+  type PartyRoleKey,
+} from "../../utils/party-role.utils";
+
+const { Title, Text } = Typography;
+
+
+interface BookingPreviewSectionProps {
+  title: string;
+  onEdit?: () => void;
+  children: ReactNode;
+  className?: string;
+  /** Card = bordered panel; airy = title + edit + hairline divider. */
+  variant?: "card" | "airy";
+}
+
+export function BookingPreviewSection({
+  title,
+  onEdit,
+  children,
+  className,
+  variant = "card",
+}: BookingPreviewSectionProps) {
+  const { t } = useTranslation("booking");
+  if (variant === "airy") {
+    return (
+      <section
+        className={["booking-review__section", className]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div className="booking-review__section-head">
+          <Title level={4} className="booking-review__title">
+            {title}
+          </Title>
+          {onEdit ? (
+            <Tooltip title={t("wizard.preview.editSection", { title })}>
+              <AppButton
+                type="text"
+                size="small"
+                className="booking-review__edit"
+                icon={<AppIcon icon={Icons.edit} size={16} />}
+                aria-label={t("wizard.preview.editSection", { title })}
+                onClick={onEdit}
+              />
+            </Tooltip>
+          ) : null}
+        </div>
+        <div className="booking-review__section-body">{children}</div>
+      </section>
+    );
+  }
+
+  return (
+    <Card
+      className={[
+        "form-step-card form-step-section booking-preview-section",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      size="small"
+      title={
+        <Title level={5} className="form-step-card-title">
+          {title}
+        </Title>
+      }
+      extra={
+        onEdit ? (
+          <ListActionsRow>
+            <ListActionButton
+              title={t("wizard.preview.editSection", { title })}
+              icon={<AppIcon icon={Icons.edit} size={16} tone="edit" />}
+              tone="edit"
+              onClick={onEdit}
+            />
+          </ListActionsRow>
+        ) : null
+      }
+    >
+      {children}
+    </Card>
+  );
+}
+
+export function BookingPreviewEmpty({ label }: { label?: string }) {
+  const { t } = useTranslation("booking");
+  return (
+    <Text type="secondary" className="booking-preview-empty">
+      {label ?? t("wizard.preview.empty.noData")}
+    </Text>
+  );
+}
+
+export function BookingPreviewFieldGrid({
+  items,
+}: {
+  items: { label: string; value: string }[];
+}) {
+  const remainder = items.length % 4;
+  const padded =
+    remainder === 0 ? items : [...items, ...Array(4 - remainder).fill(null)];
+
+  return (
+    <div className="booking-review__grid">
+      {padded.map((item, index) =>
+        item ? (
+          <div key={`${item.label}-${index}`} className="booking-review__field">
+            <span className="booking-review__label">{item.label}</span>
+            <span className="booking-review__value">{item.value}</span>
+          </div>
+        ) : (
+          <div
+            key={`pad-${index}`}
+            className="booking-review__field booking-review__field--pad"
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+function partyAddress(card: PartyCardData): string {
+  return [card.address, card.city, card.country].filter(Boolean).join(", ");
+}
+
+/** Airy review party card — role · company · contact stack · address. */
+export function BookingPreviewPartyCard({
+  role,
+  card,
+}: {
+  role: PartyRoleKey;
+  card: PartyCardData;
+}) {
+  const { t } = useTranslation("booking");
+  const address = partyAddress(card);
+
+  return (
+    <div className="booking-review__party">
+      <span className="booking-review__party-role">
+        {getPreviewPartyRoleLabel(role, t)}
+      </span>
+      <Text strong className="booking-review__party-company">
+        {card.company}
+      </Text>
+      <div className="booking-review__party-contact">
+        <span>{card.contact || "—"}</span>
+        <span>{card.phone || "—"}</span>
+        <span>{card.email || "—"}</span>
+      </div>
+      <div className="booking-review__party-address">{address || "—"}</div>
+    </div>
+  );
+}
+
+export function BookingPreviewEmptyPartyCard({ role }: { role: PartyRoleKey }) {
+  const { t } = useTranslation("booking");
+  return (
+    <div className="booking-review__party booking-review__party--empty">
+      <span className="booking-review__party-role">
+        {getPreviewPartyRoleLabel(role, t)}
+      </span>
+      <Text type="secondary">{t("wizard.preview.notAssigned")}</Text>
+    </div>
+  );
+}

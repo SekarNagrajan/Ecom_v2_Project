@@ -1,0 +1,352 @@
+// Modified by Sekar Nagarajan (2026-09-11 12:12)
+import type { PartiesData } from "../types/booking.types";
+
+export type PartyRoleKey =
+  | "shipper"
+  | "consignee"
+  | "notifyParty"
+  | "notifyParty2"
+  | "forwarder"
+  | "agreementParty"
+  | "siSubmittingParty";
+
+export interface PartyCardData {
+  company: string;
+  contact: string;
+  address: string;
+  city: string;
+  country: string;
+  email: string;
+  phone: string;
+}
+
+/**
+ * Primary parties always shown in the Assigned Parties grid.
+ * Booking Party (shipper) is view-only; Agreement Party is editable but not deletable.
+ */
+export const DEFAULT_PARTY_ROLES: readonly PartyRoleKey[] = ["shipper", "agreementParty"] as const;
+
+export const PARTY_ROLE_OPTIONS: { key: PartyRoleKey; label: string }[] = [
+  // { key: "shipper", label: "Booking Party" },
+  { key: "siSubmittingParty", label: "Shipper" },
+  { key: "consignee", label: "Consignee" },
+  { key: "notifyParty", label: "Notify Party" },
+  { key: "notifyParty2", label: "Notify Party 2" },
+  { key: "forwarder", label: "Forwarder" },
+  // { key: "agreementParty", label: "Agreement Party" },
+];
+
+export const PARTY_ROLE_LABEL: Record<PartyRoleKey, string> = {
+  shipper: "Booking Party",
+  consignee: "Consignee",
+  notifyParty: "Notify Party",
+  notifyParty2: "Notify Party 2",
+  forwarder: "Forwarder",
+  agreementParty: "Agreement Party",
+  siSubmittingParty: "Shipper",
+};
+
+/** Preview/review labels — differ for shipper ("Shipper") and forwarder ("Freight Forwarder"). */
+const REVIEW_PARTY_ROLE_LABEL: Record<PartyRoleKey, string> = {
+  shipper: "Shipper",
+  consignee: "Consignee",
+  notifyParty: "Notify Party",
+  notifyParty2: "Notify Party 2",
+  forwarder: "Freight Forwarder",
+  agreementParty: "Agreement Party",
+  siSubmittingParty: "Shipper",
+};
+
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+export function getPartyRoleLabel(role: PartyRoleKey, t?: TranslateFn): string {
+  if (!t) return PARTY_ROLE_LABEL[role];
+  switch (role) {
+    case "shipper":
+      return t("wizard.parties.roles.shipper");
+    case "siSubmittingParty":
+      return t("wizard.parties.roles.siSubmittingParty");
+    case "consignee":
+      return t("wizard.parties.roles.consignee");
+    case "notifyParty":
+      return t("wizard.parties.roles.notifyParty");
+    case "notifyParty2":
+      return t("wizard.parties.roles.notifyParty2");
+    case "forwarder":
+      return t("wizard.parties.roles.forwarder");
+    case "agreementParty":
+      return t("wizard.parties.roles.agreementParty");
+    default: {
+      const _exhaustive: never = role;
+      return PARTY_ROLE_LABEL[_exhaustive];
+    }
+  }
+}
+
+export function getPreviewPartyRoleLabel(role: PartyRoleKey, t?: TranslateFn): string {
+  if (!t) return REVIEW_PARTY_ROLE_LABEL[role];
+  switch (role) {
+    case "shipper":
+      return t("wizard.parties.previewRoles.shipper");
+    case "forwarder":
+      return t("wizard.parties.previewRoles.forwarder");
+    default:
+      return getPartyRoleLabel(role, t);
+  }
+}
+
+export function getPartyRoleOptions(t: TranslateFn): { key: PartyRoleKey; label: string }[] {
+  return PARTY_ROLE_OPTIONS.map((o) => ({ key: o.key, label: getPartyRoleLabel(o.key, t) }));
+}
+
+/** ecom-app CustomerDetailsStep demo seed — used when parties are empty. */
+const BOOKING_PARTY_SEED: PartyCardData = {
+  company: "Global Shipping Solutions Ltd.",
+  contact: "John Smith",
+  address: "123 Harbor Street, Singapore 048582",
+  city: "Singapore",
+  country: "SG",
+  email: "john.smith@globalshipping.com",
+  phone: "+65 6123 4567",
+};
+
+// Modified by Sekar Nagarajan (2026-08-31 22:47)
+export const MOCK_DEFAULT_PARTY_CARDS: Partial<Record<PartyRoleKey, PartyCardData>> = {
+  shipper: { ...BOOKING_PARTY_SEED },
+  agreementParty: { ...BOOKING_PARTY_SEED },
+};
+
+/** CSS modifier for mild per-role card background (see booking-module-styles). */
+export function partyRoleCardClassName(role: PartyRoleKey, empty = false): string {
+  return [
+    "booking-party-card",
+    `booking-party-card--${role}`,
+    empty ? "booking-party-card--empty" : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function emptyPartyCard(): PartyCardData {
+  return {
+    company: "",
+    contact: "",
+    address: "",
+    city: "",
+    country: "",
+    email: "",
+    phone: "",
+  };
+}
+
+export function partiesToCards(
+  parties: PartiesData | null | undefined,
+): Partial<Record<PartyRoleKey, PartyCardData>> {
+  if (!parties) return {};
+  const cards: Partial<Record<PartyRoleKey, PartyCardData>> = {};
+  if (parties.shipperName) {
+    cards.shipper = {
+      company: parties.shipperName,
+      contact: parties.shipperContact || parties.shipperReference || "",
+      address: parties.shipperAddress || "",
+      city: parties.shipperCity || "",
+      country: parties.shipperCountry || "",
+      email: parties.shipperEmail || "",
+      phone: parties.shipperPhone || "",
+    };
+  }
+  if (parties.consigneeName) {
+    cards.consignee = {
+      company: parties.consigneeName,
+      contact: parties.consigneeContact || "",
+      address: parties.consigneeAddress || "",
+      city: parties.consigneeCity || "",
+      country: parties.consigneeCountry || "",
+      email: parties.consigneeEmail || "",
+      phone: parties.consigneePhone || "",
+    };
+  }
+  if (parties.notifyPartyName) {
+    cards.notifyParty = {
+      company: parties.notifyPartyName,
+      contact: parties.notifyPartyContact || "",
+      address: parties.notifyPartyAddress || "",
+      city: parties.notifyPartyCity || "",
+      country: parties.notifyPartyCountry || "",
+      email: parties.notifyPartyEmail || "",
+      phone: parties.notifyPartyPhone || "",
+    };
+  }
+  if (parties.notifyParty2Name) {
+    cards.notifyParty2 = {
+      company: parties.notifyParty2Name,
+      contact: parties.notifyParty2Contact || "",
+      address: parties.notifyParty2Address || "",
+      city: parties.notifyParty2City || "",
+      country: parties.notifyParty2Country || "",
+      email: parties.notifyParty2Email || "",
+      phone: parties.notifyParty2Phone || "",
+    };
+  }
+  if (parties.freightForwarder) {
+    cards.forwarder = {
+      company: parties.freightForwarder,
+      contact: parties.freightForwarderContact || "",
+      address: parties.freightForwarderAddress || "",
+      city: parties.freightForwarderCity || "",
+      country: parties.freightForwarderCountry || "",
+      email: parties.freightForwarderEmail || "",
+      phone: parties.freightForwarderPhone || "",
+    };
+  }
+  if (parties.agreementParty) {
+    cards.agreementParty = {
+      company: parties.agreementParty,
+      contact: parties.agreementPartyContact || "",
+      address: parties.agreementPartyAddress || "",
+      city: parties.agreementPartyCity || "",
+      country: parties.agreementPartyCountry || "",
+      email: parties.agreementPartyEmail || "",
+      phone: parties.agreementPartyPhone || "",
+    };
+  }
+  if (parties.siSubmittingParty) {
+    cards.siSubmittingParty = {
+      company: parties.siSubmittingParty,
+      contact: parties.siSubmittingPartyContact || "",
+      address: parties.siSubmittingPartyAddress || "",
+      city: parties.siSubmittingPartyCity || "",
+      country: parties.siSubmittingPartyCountry || "",
+      email: parties.siSubmittingPartyEmail || "",
+      phone: parties.siSubmittingPartyPhone || "",
+    };
+  }
+  return cards;
+}
+
+/** `cardsToParties` mirrors the Booking Party into the required
+ *  `siSubmittingParty` field when the user never assigned one, so a value that
+ *  still matches the Booking Party is a derived default, not an assignment. */
+function isDerivedSiSubmittingParty(parties: PartiesData): boolean {
+  return (
+    !!parties.siSubmittingParty &&
+    parties.siSubmittingParty === parties.shipperName &&
+    (parties.siSubmittingPartyContact || "") === (parties.shipperContact || "") &&
+    (parties.siSubmittingPartyAddress || "") === (parties.shipperAddress || "") &&
+    (parties.siSubmittingPartyCity || "") === (parties.shipperCity || "") &&
+    (parties.siSubmittingPartyCountry || "") === (parties.shipperCountry || "") &&
+    (parties.siSubmittingPartyEmail || "") === (parties.shipperEmail || "") &&
+    (parties.siSubmittingPartyPhone || "") === (parties.shipperPhone || "")
+  );
+}
+
+// Modified by Sekar Nagarajan (2026-09-11 12:12)
+/** Cards the user actually assigned — drops the derived SI Submitting Party so
+ *  revisiting Customer Details does not grow an extra card. */
+export function assignedPartyCards(
+  parties: PartiesData | null | undefined,
+): Partial<Record<PartyRoleKey, PartyCardData>> {
+  const cards = partiesToCards(parties);
+  if (parties && isDerivedSiSubmittingParty(parties)) {
+    delete cards.siSubmittingParty;
+  }
+  return cards;
+}
+
+/** Assigned parties in the order Customer Details renders them: the default
+ *  roles first, then any extra role in `PARTY_ROLE_OPTIONS` order. */
+export function orderedAssignedParties(
+  parties: PartiesData | null | undefined,
+): [PartyRoleKey, PartyCardData][] {
+  const cards = assignedPartyCards(parties);
+  const order: PartyRoleKey[] = [
+    ...DEFAULT_PARTY_ROLES,
+    ...PARTY_ROLE_OPTIONS.map((option) => option.key).filter(
+      (key) => !DEFAULT_PARTY_ROLES.includes(key),
+    ),
+  ];
+  return order.flatMap((role) => {
+    const card = cards[role];
+    return card ? [[role, card] as [PartyRoleKey, PartyCardData]] : [];
+  });
+}
+
+// Modified by Sekar Nagarajan (2026-08-31 23:08)
+/** Use saved parties when present; otherwise seed ecom-app mock defaults.
+ *  Auto-populates agreementParty from shipper when missing. */
+export function initialPartyCards(
+  parties: PartiesData | null | undefined,
+): Partial<Record<PartyRoleKey, PartyCardData>> {
+  const fromPayload = assignedPartyCards(parties);
+  if (Object.keys(fromPayload).length > 0) {
+    if (!fromPayload.agreementParty && fromPayload.shipper) {
+      fromPayload.agreementParty = { ...fromPayload.shipper };
+    }
+    return fromPayload;
+  }
+  return structuredClone(MOCK_DEFAULT_PARTY_CARDS);
+}
+
+export function cardsToParties(cards: Partial<Record<PartyRoleKey, PartyCardData>>): PartiesData {
+  const shipper = cards.shipper;
+  const consignee = cards.consignee;
+  const notify = cards.notifyParty;
+  const notify2 = cards.notifyParty2;
+  const forwarder = cards.forwarder;
+  const agreement = cards.agreementParty;
+  const si = cards.siSubmittingParty;
+
+  return {
+    shipperName: shipper?.company || "",
+    shipperReference: "",
+    shipperContact: shipper?.contact || "",
+    shipperAddress: shipper?.address || "",
+    shipperCity: shipper?.city || "",
+    shipperCountry: shipper?.country || "",
+    shipperEmail: shipper?.email || "",
+    shipperPhone: shipper?.phone || "",
+    consigneeName: consignee?.company || "",
+    consigneeContact: consignee?.contact || "",
+    consigneeAddress: consignee?.address || "",
+    consigneeCity: consignee?.city || "",
+    consigneeCountry: consignee?.country || "",
+    consigneeEmail: consignee?.email || "",
+    consigneePhone: consignee?.phone || "",
+    notifyPartyName: notify?.company || "",
+    notifyPartyContact: notify?.contact || "",
+    notifyPartyAddress: notify?.address || "",
+    notifyPartyCity: notify?.city || "",
+    notifyPartyCountry: notify?.country || "",
+    notifyPartyEmail: notify?.email || "",
+    notifyPartyPhone: notify?.phone || "",
+    notifyParty2Name: notify2?.company || "",
+    notifyParty2Contact: notify2?.contact || "",
+    notifyParty2Address: notify2?.address || "",
+    notifyParty2City: notify2?.city || "",
+    notifyParty2Country: notify2?.country || "",
+    notifyParty2Email: notify2?.email || "",
+    notifyParty2Phone: notify2?.phone || "",
+    freightForwarder: forwarder?.company || "",
+    freightForwarderContact: forwarder?.contact || "",
+    freightForwarderAddress: forwarder?.address || "",
+    freightForwarderCity: forwarder?.city || "",
+    freightForwarderCountry: forwarder?.country || "",
+    freightForwarderEmail: forwarder?.email || "",
+    freightForwarderPhone: forwarder?.phone || "",
+    agreementParty: agreement?.company || "",
+    agreementPartyContact: agreement?.contact || "",
+    agreementPartyAddress: agreement?.address || "",
+    agreementPartyCity: agreement?.city || "",
+    agreementPartyCountry: agreement?.country || "",
+    agreementPartyEmail: agreement?.email || "",
+    agreementPartyPhone: agreement?.phone || "",
+    // Mock / empty flow: SI Submitting defaults to Booking Party when unset
+    siSubmittingParty: si?.company || shipper?.company || "",
+    siSubmittingPartyContact: si?.contact || shipper?.contact || "",
+    siSubmittingPartyAddress: si?.address || shipper?.address || "",
+    siSubmittingPartyCity: si?.city || shipper?.city || "",
+    siSubmittingPartyCountry: si?.country || shipper?.country || "",
+    siSubmittingPartyEmail: si?.email || shipper?.email || "",
+    siSubmittingPartyPhone: si?.phone || shipper?.phone || "",
+  };
+}

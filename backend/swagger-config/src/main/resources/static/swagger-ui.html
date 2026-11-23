@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ECOM API - Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="./swagger-ui-bundle.css" />
+    <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin:0;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    
+    <script src="./swagger-ui-bundle.js" charset="UTF-8"> </script>
+    <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+    <script>
+        window.onload = function() {
+            // Build a system
+            const ui = SwaggerUIBundle({
+                url: window.location.origin + window.location.pathname.replace(/\/swagger-ui.*$/, '') + '/v3/api-docs',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout"
+            });
+
+            window.ui = ui;
+            
+            // Initialize our custom authentication monitoring after a delay
+            setTimeout(function() {
+                initializeAuthMonitoring();
+                restoreAuthAfterRefresh(); // Restore token if page was refreshed
+            }, 2000);
+        };
+        
+        // Inline authentication monitoring (simplified version)
+        function initializeAuthMonitoring() {
+            console.log('🚀 Starting authentication monitoring...');
+            
+            let lastAuthState = null;
+            
+            function checkAuth() {
+                try {
+                    const ui = window.ui;
+                    let token = null;
+                    let username = null;
+                    
+                    // Get token using the working method
+                    if (ui && ui.authSelectors) {
+                        const authorized = ui.authSelectors.authorized();
+                        if (authorized && authorized.size > 0) {
+                            const authObj = authorized.toJS ? authorized.toJS() : authorized;
+                            if (authObj.JWT && authObj.JWT.value) {
+                                token = authObj.JWT.value;
+                            }
+                        }
+                    }
+                    
+                    if (token) {
+                        // Test authentication
+                        fetch(window.location.pathname.replace(/\/swagger-ui.*$/, '') + '/swagger-auth/auth-status', {
+                            headers: { 'Authorization': token }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            const currentState = {
+                                authenticated: data.authenticated,
+                                username: data.username
+                            };
+                            
+                            const stateChanged = !lastAuthState || 
+                                lastAuthState.authenticated !== currentState.authenticated ||
+                                lastAuthState.username !== currentState.username;
+                            
+                            if (stateChanged && currentState.authenticated) {
+                                console.log('🎉 Authentication detected!', currentState);
+                                lastAuthState = currentState;
+                                showAuthSuccess(currentState.username);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log('Auth check error:', e);
+                }
+            }
+            
+            function showAuthSuccess(username) {
+                // Remove existing message
+                const existing = document.getElementById('auto-auth-success');
+                if (existing) existing.remove();
+                
+                const div = document.createElement('div');
+                div.id = 'auto-auth-success';
+                div.style.cssText = `
+                    position: fixed; top: 10px; right: 10px; z-index: 9999;
+                    padding: 20px; background: #4caf50; color: white; border-radius: 12px;
+                    font-family: Arial, sans-serif; min-width: 350px;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+                `;
+                div.innerHTML = `
+                    <div style="font-size: 18px; font-weight: bold; margin-bottom: 12px;">
+                        🎉 AUTHENTICATED!
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <strong>User:</strong> ${username}
+                    </div>
+                    <button onclick="refreshWithAuth()" 
+                            style="width: 100%; padding: 12px; background: white; color: #4caf50; 
+                                   border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px;">
+                        🔄 REFRESH TO SEE API GROUPS
+                    </button>
+                    <div style="margin-top: 8px; text-align: center;">
+                        <button onclick="this.parentElement.parentElement.remove()" 
+                                style="background: none; border: none; color: white; text-decoration: underline; cursor: pointer; font-size: 12px;">
+                            Close
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(div);
+            }
+            
+            // Function to refresh while preserving authentication
+            window.refreshWithAuth = function() {
+                console.log('🔄 Refreshing with auth preservation...');
+                
+                // Get current token before refresh
+                const ui = window.ui;
+                let currentToken = null;
+                
+                if (ui && ui.authSelectors) {
+                    const authorized = ui.authSelectors.authorized();
+                    if (authorized && authorized.size > 0) {
+                        const authObj = authorized.toJS ? authorized.toJS() : authorized;
+                        if (authObj.JWT && authObj.JWT.value) {
+                            currentToken = authObj.JWT.value;
+                        }
+                    }
+                }
+                
+                if (currentToken) {
+                    // Store token in localStorage before refresh
+                    localStorage.setItem('swagger-preserved-token', currentToken);
+                    localStorage.setItem('swagger-preserve-timestamp', Date.now().toString());
+                    console.log('✅ Token preserved for refresh');
+                }
+                
+                // Reload the page
+                window.location.reload();
+            }
+            
+            // Function to restore authentication after page load
+            function restoreAuthAfterRefresh() {
+                const preservedToken = localStorage.getItem('swagger-preserved-token');
+                const preserveTimestamp = localStorage.getItem('swagger-preserve-timestamp');
+                
+                if (preservedToken && preserveTimestamp) {
+                    const age = Date.now() - parseInt(preserveTimestamp);
+                    
+                    // Only restore if token was preserved less than 1 minute ago
+                    if (age < 60000) {
+                        console.log('🔄 Restoring preserved token...');
+                        
+                        // Wait for Swagger UI to be ready
+                        const restoreInterval = setInterval(() => {
+                            const ui = window.ui;
+                            if (ui && ui.authActions) {
+                                try {
+                                    // Use Swagger UI's auth actions to set the token
+                                    ui.authActions.authorize({
+                                        JWT: {
+                                            name: 'JWT',
+                                            schema: { type: 'apiKey', in: 'header', name: 'Authorization' },
+                                            value: preservedToken
+                                        }
+                                    });
+                                    
+                                    console.log('✅ Token restored successfully');
+                                    clearInterval(restoreInterval);
+                                    
+                                    // Clean up stored token
+                                    localStorage.removeItem('swagger-preserved-token');
+                                    localStorage.removeItem('swagger-preserve-timestamp');
+                                    
+                                    // Show success message after restoration
+                                    setTimeout(() => {
+                                        checkAuth();
+                                    }, 1000);
+                                    
+                                } catch (e) {
+                                    console.log('Error restoring token:', e);
+                                    clearInterval(restoreInterval);
+                                }
+                            }
+                        }, 500);
+                        
+                        // Timeout after 10 seconds
+                        setTimeout(() => {
+                            clearInterval(restoreInterval);
+                        }, 10000);
+                        
+                    } else {
+                        console.log('⏰ Preserved token too old, discarding');
+                        localStorage.removeItem('swagger-preserved-token');
+                        localStorage.removeItem('swagger-preserve-timestamp');
+                    }
+                }
+            }
+            
+            // Check immediately and then every 3 seconds
+            checkAuth();
+            setInterval(checkAuth, 3000);
+            
+            console.log('✅ Authentication monitoring started');
+        }
+    </script>
+</body>
+</html>

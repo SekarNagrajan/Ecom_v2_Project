@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Archiver-Version: Plexus Archiver
+Created-By: Apache Maven
+Built-By: root
+Build-Jdk: 1.8.0_412
+CompanyName: Solverminds
+ModuleName: Surcharge Engine
+VersionNo: 1.0.0
+DependJars:  javaee-web-api~7.0, serverutils~1.0
+Date: 02/06/2026 11:53:11
+

@@ -1,0 +1,273 @@
+// Modified by Sekar Nagarajan (2026-10-20)
+import { AppButton } from "@solverminds/shared-ui";
+import {
+  DataView,
+  type DataViewColumn,
+} from "@solverminds/shared-ui/data-view";
+import { useToast } from "@solverminds/shared-ui/hooks";
+import { useNavigate } from "@tanstack/react-router";
+import { Space, Tag } from "antd";
+import { useCallback, useState } from "react";
+
+import {
+  AppIcon,
+  Icons,
+  NavBookingIcon,
+  NavRatesIcon,
+} from "../../../components/icons";
+import { buildActionsColumn } from "../../../components/shared/build-actions-column";
+import {
+  ListActionButton,
+  ListActionsRow,
+} from "../../../components/shared/list-action-button";
+import {
+  ModuleEmptyState,
+  buildRetryAction,
+} from "../../../components/shared/module-empty-state";
+import { useLocalGridProfiles } from "../../../components/shared/use-local-grid-profiles";
+import { useModuleTitles } from "../../../i18n/use-module-titles";
+import { bookingApi } from "../../booking/api/booking.api";
+import { useBookingStore } from "../../booking/stores/booking.store";
+import { buildMasterDetailsFromQuote } from "../../booking/utils/map-quote-to-master-details";
+import { pickDefaultBookingRoute } from "../../booking/utils/pick-default-booking-route";
+import { useQuotesQuery } from "../api/user-modules.queries";
+import type { QuoteItem } from "../types/user-modules.types";
+import { QuotesCreateDrawer } from "./quotes-create-drawer";
+import { QuotesViewDrawer } from "./quotes-view-drawer";
+import { UmPanelHeader } from "./um-panel-header";
+
+const STATUS_META: Record<
+  QuoteItem["status"],
+  { color: string; label: string }
+> = {
+  QUOTED: { color: "blue", label: "Quoted" },
+  ACCEPTED: { color: "green", label: "Accepted" },
+  PENDING_REVIEW: { color: "gold", label: "Pending Review" },
+  EXPIRED: { color: "red", label: "Expired" },
+};
+
+function formatUsd(amount: number) {
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+  })} USD`;
+}
+
+export function QuotesView() {
+  const MODULE_TITLES = useModuleTitles();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { profileHandlers } = useLocalGridProfiles("quotes");
+  const {
+    data: quotes = [],
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useQuotesQuery();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteItem | null>(null);
+  const [isBookingQuote, setIsBookingQuote] = useState(false);
+
+  const handleBookQuote = useCallback(
+    async (quote: QuoteItem) => {
+      if (isBookingQuote) return;
+      setIsBookingQuote(true);
+      const store = useBookingStore.getState();
+      store.resetWizard();
+
+      const master = buildMasterDetailsFromQuote(quote);
+      try {
+        // Same lane + default-route pick as Master Details "select rate".
+        const routes = await bookingApi.searchRouting({
+          origin: master.origin,
+          delivery: master.delivery,
+          cargoReadyDate: master.cargoReadyDate,
+        });
+        const selectedRoute = pickDefaultBookingRoute(routes);
+        store.updateMasterDetails({ ...master, selectedRoute });
+        if (selectedRoute) {
+          toast.success(
+            `Quote ${quote.quoteNo} loaded with sailing ${selectedRoute.vesselName} / ${selectedRoute.voyage}.`,
+          );
+        } else {
+          toast.success(
+            `Quote ${quote.quoteNo} loaded. Choose a vessel/route on Master Details.`,
+          );
+        }
+      } catch {
+        store.updateMasterDetails(master);
+        toast.warning(
+          `Quote ${quote.quoteNo} loaded, but sailings could not be fetched. Pick a route on Master Details.`,
+        );
+      } finally {
+        setIsBookingQuote(false);
+      }
+      await navigate({ to: "/app/booking/new" });
+    },
+    [isBookingQuote, navigate, toast],
+  );
+
+  const columnDefs: DataViewColumn<QuoteItem>[] = [
+    buildActionsColumn<QuoteItem>({
+      field: "id",
+      width: 100,
+      cellRenderer: (params: { data?: QuoteItem }) => {
+        const rec = params.data;
+        if (!rec) return null;
+        return (
+          <ListActionsRow>
+            <ListActionButton
+              title="View Quote Details"
+              icon={<AppIcon icon={Icons.eye} size={16} tone="view" />}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedQuote(rec);
+              }}
+            />
+            {rec.status === "QUOTED" ? (
+              <ListActionButton
+                title="Book This Quote"
+                disabled={isBookingQuote}
+                icon={<AppIcon icon={NavBookingIcon} size={16} tone="create" />}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleBookQuote(rec);
+                }}
+              />
+            ) : null}
+          </ListActionsRow>
+        );
+      },
+    }),
+    {
+      headerName: "Quote No",
+      field: "quoteNo",
+      sortable: true,
+      flex: 1,
+      minWidth: 140,
+      cellRenderer: (params: { value?: string }) => (
+        <Space size={6}>
+          <strong>{params.value}</strong>
+        </Space>
+      ),
+    },
+    {
+      headerName: "Route",
+      field: "polCode",
+      sortable: false,
+      flex: 1,
+      minWidth: 130,
+      valueGetter: (params: { data?: QuoteItem }) =>
+        params.data ? `${params.data.polCode} → ${params.data.podCode}` : "",
+    },
+    {
+      headerName: "Equipment",
+      field: "equipmentType",
+      sortable: true,
+      flex: 1.2,
+      minWidth: 190,
+      valueGetter: (params: { data?: QuoteItem }) =>
+        params.data
+          ? `${params.data.equipmentType} · ${params.data.commodity}`
+          : "",
+    },
+    {
+      headerName: "Amount",
+      field: "totalAmountUSD",
+      sortable: true,
+      width: 140,
+      cellRenderer: (params: { value?: number }) =>
+        params.value == null ? (
+          "—"
+        ) : (
+          <span className="um-amount-primary">{formatUsd(params.value)}</span>
+        ),
+    },
+    {
+      headerName: "Valid Until",
+      field: "validTo",
+      sortable: true,
+      width: 120,
+    },
+    {
+      headerName: "Status",
+      field: "status",
+      sortable: true,
+      width: 130,
+      cellRenderer: (params: { value?: QuoteItem["status"] }) => {
+        const st = params.value;
+        if (!st) return null;
+        const meta = STATUS_META[st];
+        return <Tag color={meta.color}>{meta.label}</Tag>;
+      },
+    },
+  ];
+
+  const emptyState = isError ? (
+    <ModuleEmptyState
+      variant="error"
+      title="Couldn't load your quotes"
+      message="The request didn't complete. Check your connection and try again."
+      actions={[buildRetryAction(() => void refetch())]}
+    />
+  ) : (
+    <ModuleEmptyState
+      variant="blank"
+      title="No quotes yet"
+      message="Request a rate to receive and compare a shipment quote."
+    />
+  );
+
+  return (
+    <div className="um-page-layout">
+      <UmPanelHeader
+        icon={NavRatesIcon}
+        title={MODULE_TITLES.quotes}
+        description="Request a rate, review quotes, and book when an offer is ready."
+        extra={
+          <AppButton
+            type="primary"
+            icon={<AppIcon icon={Icons.plus} size={16} />}
+            onClick={() => setIsCreateOpen(true)}
+          >
+            Request Quote
+          </AppButton>
+        }
+      />
+
+      <div className="um-grid-wrap um-quotes-grid responsive-table-wrap custom-scroll">
+        <DataView
+          className="um-data-view"
+          columnDefs={columnDefs}
+          rowData={quotes}
+          loading={isLoading || isFetching}
+          emptyState={emptyState}
+          allowedViewModes={["list"]}
+          defaultViewMode="list"
+          renderToolbar={() => null}
+          listOptions={{
+            ...profileHandlers,
+            showToolbar: { showTotalCount: true, fullScreen: true },
+            pagination: true,
+            paginationPageSize: 10,
+            pageSizeOptions: [10, 20, 50, 100],
+            sideBar: true,
+            defaultColDef: { filter: true },
+            gridOptions: {
+              suppressCellFocus: true,
+            },
+          }}
+        />
+      </div>
+
+      <QuotesCreateDrawer
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+      <QuotesViewDrawer
+        quote={selectedQuote}
+        onClose={() => setSelectedQuote(null)}
+      />
+    </div>
+  );
+}

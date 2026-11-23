@@ -1,0 +1,686 @@
+// Modified by Sekar Nagarajan (2026-09-11 11:52)
+import { z } from "zod";
+import type { ApiResponse } from "../../../types/api.types";
+import type { BookingRateOption } from "../mocks/booking-rates.mock";
+import { defaultTareWeightKg } from "../utils/default-tare-weight";
+import type { ReferenceField } from "../utils/reference-field.utils";
+
+/** One sail/move leg — JSP Route row inside a routing option (module details). */
+export const bookingRouteLegSchema = z.object({
+  id: z.string().min(1),
+  legType: z.enum(["Mainline", "Feeder", "Inland", "Vessel"]),
+  vesselName: z.string().min(1),
+  vesselCode: z.string().optional(),
+  voyage: z.string().optional(),
+  bound: z.string().optional(),
+  serviceName: z.string().optional(),
+  serviceCode: z.string().optional(),
+  polPortId: z.string().min(1),
+  polPortName: z.string().min(1),
+  podPortId: z.string().min(1),
+  podPortName: z.string().min(1),
+  etd: z.string().min(1),
+  eta: z.string().min(1),
+  terminal: z.string().optional(),
+});
+
+export type BookingRouteLeg = z.infer<typeof bookingRouteLegSchema>;
+
+/** Selected vessel/route from ebookRoutingDetails-style popup (JSP parity). */
+export const selectedRouteSchema = z.object({
+  routeId: z.string().min(1),
+  serviceCode: z.string().min(1),
+  serviceName: z.string().min(1),
+  vesselCode: z.string().min(1),
+  vesselName: z.string().min(1),
+  voyage: z.string().min(1),
+  bound: z.string().min(1),
+  polPortId: z.string().min(1),
+  polPortName: z.string().min(1),
+  podPortId: z.string().min(1),
+  podPortName: z.string().min(1),
+  polTerminal: z.string().optional(),
+  podTerminal: z.string().optional(),
+  etd: z.string().min(1),
+  eta: z.string().min(1),
+  transitTimeDays: z.number(),
+  isDirect: z.boolean(),
+  isDefaultRoute: z.boolean().optional(),
+  transshipmentCount: z.number().optional(),
+  shipmentKind: z.enum(["Direct", "Transshipment", "Multimodal"]).optional(),
+  gateInCutoff: z.string().optional(),
+  siDocCutoff: z.string().optional(),
+  vgmCutoff: z.string().optional(),
+  /** Module / leg timeline for Transshipment & Multimodal (eBookingRouteDetails parity). */
+  legs: z.array(bookingRouteLegSchema).optional(),
+});
+
+export type SelectedRoute = z.infer<typeof selectedRouteSchema>;
+
+// Step 1: Master Details (formerly Routing & Schedule)
+export const masterDetailsSchema = z.object({
+  origin: z.string().min(1, "Origin is required"),
+  delivery: z.string().min(1, "Delivery is required"),
+  cargoReadyDate: z.string().min(1, "Cargo Ready Date is required"),
+  haulageOriginType: z.enum(["Carrier", "Merchant"]).default("Merchant"),
+  haulageDestinationType: z.enum(["Carrier", "Merchant"]).default("Merchant"),
+  carriageContract: z.string().optional(),
+  onlineBookingNo: z.string().optional(),
+  agreementParty: z.string().optional(),
+  preferredAgency: z.string().optional(),
+  additionalInformation: z.string().optional(), // Keep as fallback/general notes
+
+  // Structured Additional Info
+  rateReference: z.string().optional(),
+  agencyReference: z.string().optional(),
+  oceanFreight: z.enum(["Prepaid", "Collect", ""]).optional(),
+  placeOfFinalReceipt: z.string().optional(),
+  natCode: z.string().optional(),
+  haulageType: z.enum(["Live Load", "Drop Only", "Pickup only", "Pickup & Drop", ""]).optional(),
+  pickupDate: z.string().optional(),
+  dropDate: z.string().optional(),
+  haulerCode: z.string().optional(),
+  customerPo: z.string().optional(),
+  refType: z.enum(["Normal", "Express", ""]).optional(),
+  exportRef: z.string().optional(),
+  emptyPickupPoint: z.enum(["Terminal", "Depot", ""]).optional(),
+  emptyPickupFacility: z.string().optional(),
+  emptyPickupDate: z.string().optional(),
+  customerReference: z.string().optional(),
+  acid: z.string().optional(),
+  dpwShipperType: z.string().optional(),
+  dpwShipperCode: z.string().optional(),
+
+  /** Vessel/route chosen via Select Vessel/Route popup (required to leave step 0 in UI). */
+  selectedRoute: selectedRouteSchema.nullable().optional(),
+  /** Optional rate chosen from Available Rates picker (additive). */
+  selectedRate: z
+    .object({
+      rateNo: z.string(),
+      itemNo: z.string(),
+      amdNo: z.string(),
+      rateType: z.string(),
+      eqpType: z.string(),
+      amount: z.number(),
+      currency: z.string(),
+      customer: z.string(),
+      customerCode: z.string(),
+    })
+    .nullable()
+    .optional(),
+});
+
+// Step 2: Parties
+export const partiesSchema = z.object({
+  shipperName: z.string().min(3, "Booking Party is required"),
+  shipperReference: z.string().optional(),
+  shipperContact: z.string().optional(),
+  shipperAddress: z.string().optional(),
+  shipperCity: z.string().optional(),
+  shipperCountry: z.string().optional(),
+  shipperEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  shipperPhone: z.string().optional(),
+  consigneeName: z.string().optional(),
+  consigneeContact: z.string().optional(),
+  consigneeAddress: z.string().optional(),
+  consigneeCity: z.string().optional(),
+  consigneeCountry: z.string().optional(),
+  consigneeEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  consigneePhone: z.string().optional(),
+  notifyPartyName: z.string().optional(),
+  notifyPartyContact: z.string().optional(),
+  notifyPartyAddress: z.string().optional(),
+  notifyPartyCity: z.string().optional(),
+  notifyPartyCountry: z.string().optional(),
+  notifyPartyEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  notifyPartyPhone: z.string().optional(),
+  notifyParty2Name: z.string().optional(),
+  notifyParty2Contact: z.string().optional(),
+  notifyParty2Address: z.string().optional(),
+  notifyParty2City: z.string().optional(),
+  notifyParty2Country: z.string().optional(),
+  notifyParty2Email: z.string().email("Invalid email").optional().or(z.literal("")),
+  notifyParty2Phone: z.string().optional(),
+  freightForwarder: z.string().optional(),
+  freightForwarderContact: z.string().optional(),
+  freightForwarderAddress: z.string().optional(),
+  freightForwarderCity: z.string().optional(),
+  freightForwarderCountry: z.string().optional(),
+  freightForwarderEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  freightForwarderPhone: z.string().optional(),
+  agreementParty: z.string().min(1, "Agreement Party is required"),
+  agreementPartyContact: z.string().optional(),
+  agreementPartyAddress: z.string().optional(),
+  agreementPartyCity: z.string().optional(),
+  agreementPartyCountry: z.string().optional(),
+  agreementPartyEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  agreementPartyPhone: z.string().optional(),
+  siSubmittingParty: z.string().min(1, "SI Submitting Party is required"),
+  siSubmittingPartyContact: z.string().optional(),
+  siSubmittingPartyAddress: z.string().optional(),
+  siSubmittingPartyCity: z.string().optional(),
+  siSubmittingPartyCountry: z.string().optional(),
+  siSubmittingPartyEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  siSubmittingPartyPhone: z.string().optional(),
+});
+
+// Step 3: Cargo & Equipment — containers[] with nested commodities
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+/** Sequential suffix for mock container numbers (…TNB1, …TNB2, …). Starts at 1. */
+let mockContainerSeq = 0;
+
+/** Reset so the next mock number uses …TNB1 (or continue after `startAt`). */
+export function resetMockContainerSeq(startAt = 0): void {
+  mockContainerSeq = Math.max(0, startAt);
+}
+
+/** Advance the sequencer past any …TNBn values already present. */
+export function syncMockContainerSeqFromNos(containerNos: Array<string | undefined>): void {
+  let max = 0;
+  for (const no of containerNos) {
+    const match = (no ?? "").trim().match(/TNB(\d+)$/i);
+    if (match?.[1]) {
+      max = Math.max(max, Number(match[1]));
+    }
+  }
+  if (max > mockContainerSeq) {
+    mockContainerSeq = max;
+  }
+}
+
+/** Normalize equipment type to a 4-char mock prefix (e.g. 20DC, 40HC). */
+export function mockContainerTypeCode(containerType?: string): string {
+  const raw = (containerType ?? "20DC").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const code = raw.slice(0, 4);
+  return code.padEnd(4, "X");
+}
+
+/**
+ * Mock container number: {type}TNB{n} — e.g. 20DCTNB1, 40HCTNB2.
+ * `n` starts at 1 and increments for each new number (unless uniqueIndex is passed).
+ */
+export function createMockContainerNo(containerType = "20DC", uniqueIndex?: number): string {
+  const typeCode = mockContainerTypeCode(containerType);
+  let seq: number;
+  if (uniqueIndex !== undefined && uniqueIndex > 0) {
+    seq = uniqueIndex;
+    if (uniqueIndex > mockContainerSeq) {
+      mockContainerSeq = uniqueIndex;
+    }
+  } else {
+    seq = ++mockContainerSeq;
+  }
+  return `${typeCode}TNB${seq}`;
+}
+
+/** Keep unique suffix when type changes on an existing mock number. */
+export function applyContainerTypeToMockNo(
+  containerNo: string | undefined,
+  containerType: string,
+): string {
+  const current = (containerNo ?? "").trim();
+  const typeCode = mockContainerTypeCode(containerType);
+  const match = current.match(/^.{4}(TN.*)$/i);
+  if (match?.[1]) {
+    return `${typeCode}${match[1].toUpperCase()}`;
+  }
+  return createMockContainerNo(containerType);
+}
+
+export type ValidationTranslateFn = (key: string) => string;
+
+function defaultVT(key: string): string {
+  const fallback: Record<string, string> = {
+    "wizard.cargo.validation.commodityRequired": "Commodity is required",
+    "wizard.cargo.validation.weightRequired": "Weight is required",
+    "wizard.cargo.validation.containerTypeRequired": "Container type is required",
+    "wizard.cargo.validation.atLeastOneCommodity": "At least one commodity is required",
+    "wizard.cargo.validation.atLeastOneContainer": "At least one container is required",
+    "wizard.cargo.validation.setTempRequired": "Set Temp is required for operating reefer",
+    "wizard.cargo.validation.tempUnitRequired": "Temp Unit is required for operating reefer",
+    "wizard.cargo.validation.dimensionUnitRequired": "Dimension Unit is required for OOG",
+    "wizard.cargo.validation.unNoRequired": "UN No is required",
+    "wizard.cargo.validation.dgClassRequired": "DG Class is required",
+    "wizard.insurance.validation.currencyRequired": "Currency is required",
+    "wizard.insurance.validation.cargoValueMin": "Cargo value must be greater than 0",
+    "wizard.insurance.validation.acceptTerms": "You must accept the insurance terms",
+    "wizard.ens.validation.invalidEmail": "Invalid email",
+  };
+  return fallback[key] ?? key;
+}
+
+export const commodityItemSchema = z.object({
+  id: z.string().min(1),
+  commodity: z.string().optional(),
+  hsCode: z.string().min(1, "Commodity is required"),
+  classCode: z.string().optional(),
+  weight: z.number().min(1, "Weight is required"),
+  volume: z.number().min(0).optional(),
+  packageType: z.string().optional(),
+  packageQuantity: z.number().min(0).optional(),
+  description: z.string().optional(),
+  marksAndNumbers: z.string().optional(),
+  isDangerousGoods: z.boolean().default(false),
+  unNumber: z.string().optional(),
+  dgClass: z.string().optional(),
+  flashPoint: z.string().optional(),
+  marinePollutant: z.boolean().default(false),
+  shippingName: z.string().optional(),
+});
+
+export const containerItemSchema = z.object({
+  id: z.string().min(1),
+  containerType: z.string().min(1, "Container type is required"),
+  // Modified by Sekar Nagarajan (2026-09-01 16:25)
+  containerNo: z.string().optional(),
+  quantity: z.number().min(1).max(100),
+  eqpStatus: z.enum(["LADEN", "EMPTY"]).default("LADEN"),
+  tareWeight: z.number().optional(),
+  isSoc: z.boolean().default(false),
+  reeferMode: z.enum(["none", "operating", "nor"]).default("none"),
+  setTemp: z.number().optional(),
+  minTemp: z.number().optional(),
+  maxTemp: z.number().optional(),
+  tempUnit: z.string().optional(),
+  isLcl: z.boolean().default(false),
+  isOog: z.boolean().default(false),
+  olForward: z.number().optional(),
+  olAft: z.number().optional(),
+  owLeft: z.number().optional(),
+  owRight: z.number().optional(),
+  oh: z.number().optional(),
+  dimensionUnit: z.string().optional(),
+  commodities: z.array(commodityItemSchema).min(1, "At least one commodity is required"),
+});
+
+export function createCargoSchema(t: ValidationTranslateFn = defaultVT) {
+  const commoditySchema = z.object({
+    id: z.string().min(1),
+    commodity: z.string().optional(),
+    hsCode: z.string().min(1, t("wizard.cargo.validation.commodityRequired")),
+    classCode: z.string().optional(),
+    weight: z.number().min(1, t("wizard.cargo.validation.weightRequired")),
+    volume: z.number().min(0).optional(),
+    packageType: z.string().optional(),
+    packageQuantity: z.number().min(0).optional(),
+    description: z.string().optional(),
+    marksAndNumbers: z.string().optional(),
+    isDangerousGoods: z.boolean().default(false),
+    unNumber: z.string().optional(),
+    dgClass: z.string().optional(),
+    flashPoint: z.string().optional(),
+    marinePollutant: z.boolean().default(false),
+    shippingName: z.string().optional(),
+  });
+
+  const containerSchema = z.object({
+    id: z.string().min(1),
+    containerType: z.string().min(1, t("wizard.cargo.validation.containerTypeRequired")),
+    containerNo: z.string().optional(),
+    quantity: z.number().min(1).max(100),
+    eqpStatus: z.enum(["LADEN", "EMPTY"]).default("LADEN"),
+    tareWeight: z.number().optional(),
+    isSoc: z.boolean().default(false),
+    reeferMode: z.enum(["none", "operating", "nor"]).default("none"),
+    setTemp: z.number().optional(),
+    minTemp: z.number().optional(),
+    maxTemp: z.number().optional(),
+    tempUnit: z.string().optional(),
+    isLcl: z.boolean().default(false),
+    isOog: z.boolean().default(false),
+    olForward: z.number().optional(),
+    olAft: z.number().optional(),
+    owLeft: z.number().optional(),
+    owRight: z.number().optional(),
+    oh: z.number().optional(),
+    dimensionUnit: z.string().optional(),
+    commodities: z.array(commoditySchema).min(1, t("wizard.cargo.validation.atLeastOneCommodity")),
+  });
+
+  return z
+    .object({
+      containers: z.array(containerSchema).min(1, t("wizard.cargo.validation.atLeastOneContainer")),
+    })
+    .superRefine((data, ctx) => {
+      data.containers.forEach((container, ci) => {
+        if (container.reeferMode === "operating") {
+          if (container.setTemp === undefined || container.setTemp === null) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("wizard.cargo.validation.setTempRequired"),
+              path: ["containers", ci, "setTemp"],
+            });
+          }
+          if (!container.tempUnit || container.tempUnit.trim() === "") {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("wizard.cargo.validation.tempUnitRequired"),
+              path: ["containers", ci, "tempUnit"],
+            });
+          }
+        }
+        if (container.isOog) {
+          if (!container.dimensionUnit || container.dimensionUnit.trim() === "") {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("wizard.cargo.validation.dimensionUnitRequired"),
+              path: ["containers", ci, "dimensionUnit"],
+            });
+          }
+        }
+        container.commodities.forEach((c, mi) => {
+          if (c.isDangerousGoods) {
+            if (!c.unNumber || c.unNumber.trim() === "") {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: t("wizard.cargo.validation.unNoRequired"),
+                path: ["containers", ci, "commodities", mi, "unNumber"],
+              });
+            }
+            if (!c.dgClass || c.dgClass.trim() === "") {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: t("wizard.cargo.validation.dgClassRequired"),
+                path: ["containers", ci, "commodities", mi, "dgClass"],
+              });
+            }
+          }
+        });
+      });
+    });
+}
+
+export const cargoSchema = createCargoSchema();
+
+export type CommodityItem = z.infer<typeof commodityItemSchema>;
+export type ContainerItem = z.infer<typeof containerItemSchema>;
+
+export function createEmptyCommodity(): CommodityItem {
+  return {
+    id: newId(),
+    commodity: "",
+    hsCode: "",
+    classCode: "",
+    weight: 10000,
+    volume: 0,
+    packageType: "",
+    packageQuantity: 1,
+    description: "",
+    marksAndNumbers: "",
+    isDangerousGoods: false,
+    unNumber: "",
+    dgClass: "",
+    flashPoint: "",
+    marinePollutant: false,
+    shippingName: "",
+  };
+}
+
+export function createEmptyContainer(
+  containerType = "20DC",
+  options?: { allocateMockNo?: boolean },
+): ContainerItem {
+  const allocateMockNo = options?.allocateMockNo !== false;
+  // Modified by Sekar Nagarajan (2026-09-17 23:28) — auto tare from container type (JSP getTareweight parity)
+  return {
+    id: newId(),
+    // Modified by Sekar Nagarajan (2026-08-28 12:04)
+    containerType,
+    containerNo: allocateMockNo ? createMockContainerNo(containerType) : "",
+    quantity: 1,
+    eqpStatus: "LADEN",
+    tareWeight: defaultTareWeightKg(containerType),
+    isSoc: false,
+    reeferMode: "none",
+    setTemp: undefined,
+    minTemp: undefined,
+    maxTemp: undefined,
+    tempUnit: "Celsius",
+    isLcl: false,
+    isOog: false,
+    olForward: undefined,
+    olAft: undefined,
+    owLeft: undefined,
+    owRight: undefined,
+    oh: undefined,
+    dimensionUnit: "CM",
+    commodities: [createEmptyCommodity()],
+  };
+}
+
+export function defaultCargoData(): CargoData {
+  resetMockContainerSeq(0);
+  return { containers: [createEmptyContainer()] };
+}
+
+/** Migrate legacy flat cargo shape into containers[]. */
+export function migrateLegacyCargo(legacy: unknown): CargoData {
+  if (!legacy || typeof legacy !== "object") return defaultCargoData();
+  const raw = legacy as Record<string, unknown>;
+  if (Array.isArray(raw.containers) && raw.containers.length > 0) {
+    const containers = (raw.containers as Record<string, unknown>[]).map((containerRaw) => {
+      const type = String(containerRaw.containerType ?? "20DC");
+      const base = createEmptyContainer(type, { allocateMockNo: false });
+      const commoditiesRaw = Array.isArray(containerRaw.commodities)
+        ? containerRaw.commodities
+        : [];
+      return {
+        ...base,
+        ...containerRaw,
+        id: String(containerRaw.id ?? base.id),
+        containerType: type,
+        containerNo:
+          String(containerRaw.containerNo ?? containerRaw.containerNumber ?? "").trim() ||
+          createMockContainerNo(type),
+        commodities:
+          commoditiesRaw.length > 0
+            ? commoditiesRaw.map((item) => {
+                const row = (item ?? {}) as Record<string, unknown>;
+                const empty = createEmptyCommodity();
+                return {
+                  ...empty,
+                  ...row,
+                  id: String(row.id ?? empty.id),
+                  commodity: String(row.commodity ?? ""),
+                  hsCode: String(row.hsCode ?? ""),
+                  weight: Number(row.weight ?? 1) || 1,
+                  volume: typeof row.volume === "number" ? row.volume : 0,
+                  packageType: String(row.packageType ?? ""),
+                  packageQuantity: Number(row.packageQuantity ?? 1) || 1,
+                  description: String(row.description ?? row.commodity ?? ""),
+                  marksAndNumbers: String(row.marksAndNumbers ?? ""),
+                } as CommodityItem;
+              })
+            : [createEmptyCommodity()],
+      } as ContainerItem;
+    });
+    syncMockContainerSeqFromNos(containers.map((c) => c.containerNo));
+    return { containers };
+  }
+  const commodity = createEmptyCommodity();
+  commodity.commodity = String(raw.commodity ?? "");
+  commodity.hsCode = String(raw.hsCode ?? "");
+  commodity.weight = Number(raw.totalWeightKg ?? raw.weight ?? 1) || 1;
+  commodity.volume = typeof raw.volume === "number" ? raw.volume : 0;
+  commodity.packageType = String(raw.packageType ?? "");
+  commodity.packageQuantity = Number(raw.packageQuantity ?? 1) || 1;
+  commodity.description = String(raw.description ?? raw.commodity ?? "");
+  commodity.marksAndNumbers = String(raw.marksAndNumbers ?? "");
+  commodity.isDangerousGoods = Boolean(raw.isDangerousGoods);
+  commodity.unNumber = String(raw.unNumber ?? "");
+  commodity.dgClass = String(raw.dgClass ?? "");
+  commodity.flashPoint = String(raw.flashPoint ?? "");
+  commodity.marinePollutant = Boolean(raw.marinePollutant);
+  commodity.shippingName = String(raw.shippingName ?? "");
+
+  const container = createEmptyContainer();
+  container.containerType = String(raw.containerType ?? "");
+  container.quantity = Number(raw.containerCount ?? 1) || 1;
+  container.isLcl = Boolean(raw.isLcl);
+  container.isOog = Boolean(raw.isOog);
+  container.reeferMode = raw.isReefer ? "operating" : "none";
+  container.setTemp = typeof raw.setTemp === "number" ? raw.setTemp : undefined;
+  container.minTemp = typeof raw.minTemp === "number" ? raw.minTemp : undefined;
+  container.maxTemp = typeof raw.maxTemp === "number" ? raw.maxTemp : undefined;
+  container.tempUnit = String(raw.tempUnit ?? "Celsius");
+  container.olForward = typeof raw.olForward === "number" ? raw.olForward : undefined;
+  container.olAft = typeof raw.olAft === "number" ? raw.olAft : undefined;
+  container.owLeft = typeof raw.owLeft === "number" ? raw.owLeft : undefined;
+  container.owRight = typeof raw.owRight === "number" ? raw.owRight : undefined;
+  container.oh = typeof raw.oh === "number" ? raw.oh : undefined;
+  container.dimensionUnit = String(raw.dimensionUnit ?? "CM");
+  container.commodities = [commodity];
+  return { containers: [container] };
+}
+
+export interface BookingDocument {
+  id: string;
+  type: string;
+  fileName: string;
+  uploadedAt: string;
+}
+
+export function createEnsSchema(t: ValidationTranslateFn = defaultVT) {
+  return z.object({
+    euCustomsZone: z.boolean().default(false),
+    blType: z.enum(["Straight BL", "Master BL"]).default("Straight BL"),
+    ensFilingType: z.enum(["Single Filing", "Multiple Filing"]).default("Single Filing"),
+    paymentMethod: z.enum(["Wire Transfer", "Not Prepaid"]).default("Wire Transfer"),
+
+    // Declarant
+    declarantName: z.string().optional(),
+    declarantAddress: z.string().optional(),
+    declarantCity: z.string().optional(),
+    declarantCountry: z.string().optional(),
+    declarantEori: z.string().optional(),
+    declarantEmail: z
+      .string()
+      .email(t("wizard.ens.validation.invalidEmail"))
+      .optional()
+      .or(z.literal("")),
+
+    // Buyer
+    buyerName: z.string().optional(),
+    buyerAddress: z.string().optional(),
+    buyerCity: z.string().optional(),
+    buyerCountry: z.string().optional(),
+
+    // Seller
+    sellerName: z.string().optional(),
+    sellerAddress: z.string().optional(),
+    sellerCity: z.string().optional(),
+    sellerCountry: z.string().optional(),
+  });
+}
+
+export const ensSchema = createEnsSchema();
+
+// Step 5: Insurance
+export function createInsuranceSchema(t: ValidationTranslateFn = defaultVT) {
+  return z
+    .object({
+      isInsuranceRequired: z.boolean().default(false),
+      currency: z.string().optional(),
+      cargoValue: z.number().optional(),
+      termsAccepted: z.boolean().default(false),
+    })
+    .superRefine((data, ctx) => {
+      if (data.isInsuranceRequired) {
+        if (!data.currency) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t("wizard.insurance.validation.currencyRequired"),
+            path: ["currency"],
+          });
+        }
+        if (!data.cargoValue || data.cargoValue <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t("wizard.insurance.validation.cargoValueMin"),
+            path: ["cargoValue"],
+          });
+        }
+        if (!data.termsAccepted) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t("wizard.insurance.validation.acceptTerms"),
+            path: ["termsAccepted"],
+          });
+        }
+      }
+    });
+}
+
+export const insuranceSchema = createInsuranceSchema();
+
+// Complete Booking Payload
+export type MasterDetailsData = z.infer<typeof masterDetailsSchema>;
+export type PartiesData = z.infer<typeof partiesSchema>;
+export type CargoData = z.infer<typeof cargoSchema>;
+export type EnsData = z.infer<typeof ensSchema>;
+export type InsuranceData = z.infer<typeof insuranceSchema>;
+
+export interface BookingPayload {
+  masterDetails: MasterDetailsData | null;
+  parties: PartiesData | null;
+  cargo: CargoData | null;
+  ens: EnsData | null;
+  insurance: InsuranceData | null;
+  documents?: BookingDocument[];
+  /** Dynamic reference fields (ecom-app Reference Information step). */
+  referenceFields?: ReferenceField[];
+  /** Soft draft id when saved via Save Draft. */
+  draftId?: string;
+  /**
+   * When set (duplicate flow), submit/draft always creates a new booking even if
+   * the wizard content is identical to the source booking.
+   */
+  forceCreateNew?: boolean;
+  /** Online/agency ref of the booking this wizard payload was duplicated from. */
+  duplicatedFromId?: string;
+}
+
+export interface BookingActivityEvent {
+  id: string;
+  action: string;
+  by: string;
+  at: string;
+  note?: string;
+}
+
+export type BookingSelectedRate = BookingRateOption;
+
+// API Response
+export interface BookingConfirmation {
+  bookingReference: string;
+  status: "CONFIRMED" | "PENDING" | "REJECTED";
+  submittedAt: string;
+}
+
+export type SubmitBookingResponse = ApiResponse<BookingConfirmation>;
+
+export interface BookingTemplate {
+  id: string;
+  templateName: string;
+  origin: string;
+  delivery: string;
+  payload: BookingPayload;
+}
+
+export interface ContractValidationResult {
+  valid: boolean;
+  message: string;
+  contractRef?: string;
+  contractId?: string;
+  contractName?: string;
+}
+
+export interface EoriValidationResult {
+  valid: boolean;
+  message: string;
+  eori?: string;
+}

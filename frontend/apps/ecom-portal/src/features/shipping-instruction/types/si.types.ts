@@ -1,0 +1,669 @@
+// Modified by Sekar Nagarajan (2026-08-31 16:27)
+import { z } from "zod";
+
+import type { ReferenceField } from "../../booking/utils/reference-field.utils";
+import type { SIWizardStepId } from "../config/si-wizard-config";
+
+/** List / lifecycle — mirrors SISummary.jsp statuses (+ Locked / Create Multiple SI). */
+export type SIStatus =
+  | "Create SI"
+  | "Create Multiple SI"
+  | "Draft"
+  | "Submitted"
+  | "Accepted"
+  | "Declined"
+  | "Locked";
+
+export type BLStatus = "Draft" | "Confirmed" | "Issued" | "Cancelled";
+
+export interface SIListDTO {
+  id: string;
+  siNo: string | null;
+  bookingNo: string;
+  blNo: string | null;
+  status: SIStatus;
+  blStatus: BLStatus | null;
+  agencyRefNo: string;
+  origin: string;
+  delivery: string;
+  submittedDate: string | null;
+  createdDate: string | null;
+  bookingStatus?: string | null;
+}
+
+export interface SIParty {
+  name: string;
+  address: string;
+  address2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  zip?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  eori?: string;
+  personType?: string;
+  customerCode?: string;
+  printOnBl?: boolean;
+  printHeader?: string;
+}
+
+export interface SICargoLine {
+  id: string;
+  marksAndNumbers: string;
+  description: string;
+  commodityCode: string;
+  hsCode: string;
+  packageCount: number;
+  packageType: string;
+  grossWeight: number;
+  netWeight?: number;
+  volume: number;
+  buyerName?: string;
+  sellerName?: string;
+  // Modified by Sekar Nagarajan (2026-08-28 12:22)
+  isDangerousGoods?: boolean;
+  unNumber?: string;
+  dgClass?: string;
+  flashPoint?: string;
+  marinePollutant?: boolean;
+  shippingName?: string;
+}
+
+export interface SIContainer {
+  id: string;
+  containerNo: string;
+  eqpSize: string;
+  carrierSeal: string;
+  shipperSeal: string;
+  cargoLines: SICargoLine[];
+  /** SOC / reefer / OOG — SIBLCommonCargo.jsp parity */
+  isSoc?: boolean;
+  tareWeight?: number;
+  reeferMode?: "none" | "operating" | "nor";
+  setTemp?: number;
+  tempUnit?: string;
+  ventilation?: string;
+  isOog?: boolean;
+  olForward?: number;
+  olAft?: number;
+  owLeft?: number;
+  owRight?: number;
+  oh?: number;
+  dimensionUnit?: string;
+}
+
+export type SIPrepaidCollect = "PREPAID" | "COLLECT" | "PAY_AT";
+
+export interface SIChargeLine {
+  id: string;
+  chargeCode: string;
+  description: string;
+  amount: number;
+  currency: string;
+  prepaidCollect: SIPrepaidCollect;
+  payByCustType: string;
+  prepaidAmount?: number;
+  collectAmount?: number;
+  payAtAmount?: number;
+}
+
+export interface SIRoutingLeg {
+  id: string;
+  vesselName: string;
+  voyage?: string;
+  polPortName: string;
+  podPortName: string;
+  etd: string;
+  eta: string;
+}
+
+export interface SIRouting {
+  originPrint: string;
+  polPrint: string;
+  podPrint: string;
+  deliveryPrint: string;
+  vesselVoyage: string;
+  scheduleLegs: SIRoutingLeg[];
+}
+
+export interface SIInsuranceInfo {
+  isInsuranceRequired: boolean;
+  currency: string;
+  cargoValue?: number;
+  termsAccepted: boolean;
+  optOut: boolean;
+  policyNo?: string;
+}
+
+export interface SICargoProtectLine {
+  id: string;
+  productCode: string;
+  description: string;
+  amount: number;
+  currency: string;
+}
+
+export interface SIEnsParty {
+  customerCode?: string;
+  name: string;
+  address: string;
+  address2?: string;
+  city: string;
+  country: string;
+  state?: string;
+  zip?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  eori?: string;
+  personType?: "" | "Legal" | "Natural" | "Association of persons";
+}
+
+export interface SIEnsDeclarant {
+  name: string;
+  address: string;
+  address2: string;
+  city: string;
+  zip?: string;
+  country: string;
+  state: string;
+  telephone: string;
+  eori: string;
+  email: string;
+  fillingType: "House BL" | "Sub-House BL";
+}
+
+/** ENS tab — parity with SIBLCommonENS.jsp */
+export interface SIEnsInfo {
+  ensRequired: boolean;
+  euCustZone: "Y" | "N";
+  blTypeEns: "Straight BL" | "Master BL";
+  ensFillingType: "Single Filing" | "Multiple Filing";
+  paymentMethod: "Wire Transfer" | "Not Prepaid";
+  declarant?: SIEnsDeclarant;
+  buyer: SIEnsParty;
+  seller: SIEnsParty;
+}
+
+export const SI_ENS_PERSON_TYPE_OPTIONS = [
+  { value: "", label: "Type of Person" },
+  { value: "Legal", label: "Legal" },
+  { value: "Natural", label: "Natural" },
+  {
+    value: "Association of persons",
+    label: "Association of persons",
+  },
+] as const;
+
+export const emptySiEnsParty = (): SIEnsParty => ({
+  customerCode: "",
+  name: "",
+  address: "",
+  address2: "",
+  city: "",
+  country: "",
+  state: "",
+  zip: "",
+  phone: "",
+  fax: "",
+  email: "",
+  eori: "",
+  personType: "",
+});
+
+export const emptySiEnsDeclarant = (): SIEnsDeclarant => ({
+  name: "",
+  address: "",
+  address2: "",
+  city: "",
+  zip: "",
+  country: "",
+  state: "",
+  telephone: "",
+  eori: "",
+  email: "",
+  fillingType: "House BL",
+});
+
+export function createSiEnsStepSchema(
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  const optionalEmail = (maxLen: number) =>
+    z
+      .string()
+      .max(maxLen)
+      .optional()
+      .refine(
+        (val) => !val?.trim() || z.string().email().safeParse(val).success,
+        { message: t("wizard.validation.invalidEmail") },
+      );
+
+  const siEnsPartySchema = z.object({
+    customerCode: z.string().optional(),
+    name: z.string().max(150),
+    address: z.string().max(150),
+    address2: z.string().max(150).optional(),
+    city: z.string().max(150),
+    country: z.string().max(50),
+    state: z.string().max(50).optional(),
+    zip: z.string().max(15).optional(),
+    phone: z.string().max(20).optional(),
+    fax: z.string().max(20).optional(),
+    email: optionalEmail(75),
+    eori: z.string().max(17).optional(),
+    personType: z
+      .enum(["", "Legal", "Natural", "Association of persons"])
+      .optional(),
+  });
+
+  const siEnsDeclarantSchema = z.object({
+    name: z.string().max(150),
+    address: z.string().max(150),
+    address2: z.string().max(150),
+    city: z.string().max(150),
+    zip: z.string().max(15).optional(),
+    country: z.string().max(50),
+    state: z.string().max(50),
+    telephone: z.string().max(25),
+    eori: z.string().max(20),
+    email: z
+      .string()
+      .max(100)
+      .refine(
+        (val) => !val.trim() || z.string().email().safeParse(val).success,
+        { message: t("wizard.validation.invalidEmail") },
+      ),
+    fillingType: z.enum(["House BL", "Sub-House BL"]),
+  });
+
+  return z
+    .object({
+      ensRequired: z.boolean(),
+      euCustZone: z.enum(["Y", "N"]),
+      blTypeEns: z.enum(["Straight BL", "Master BL"]),
+      ensFillingType: z.enum(["Single Filing", "Multiple Filing"]),
+      paymentMethod: z.enum(["Wire Transfer", "Not Prepaid"]),
+      declarant: siEnsDeclarantSchema.optional(),
+      buyer: siEnsPartySchema,
+      seller: siEnsPartySchema,
+    })
+    .superRefine((values, ctx) => {
+      if (!values.ensRequired) return;
+
+      if (values.ensFillingType === "Multiple Filing") {
+        const d = values.declarant;
+        const requiredDeclarant: Array<keyof SIEnsDeclarant> = [
+          "name",
+          "address",
+          "address2",
+          "city",
+          "country",
+          "state",
+          "telephone",
+          "eori",
+          "email",
+          "fillingType",
+        ];
+        for (const key of requiredDeclarant) {
+          const value = d?.[key];
+          if (!value || !String(value).trim()) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["declarant", key],
+              message: t("wizard.validation.ensRequiredMultipleFiling"),
+            });
+          }
+        }
+        return;
+      }
+
+      const requireParty = (
+        party: z.infer<typeof siEnsPartySchema>,
+        path: "buyer" | "seller",
+        partyLabel: string,
+      ) => {
+        if (!party.name.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            path: [path, "name"],
+            message: t("wizard.validation.ensPartyNameRequired", {
+              party: partyLabel,
+            }),
+          });
+        }
+        if (!party.address.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            path: [path, "address"],
+            message: t("wizard.validation.ensPartyAddressRequired", {
+              party: partyLabel,
+            }),
+          });
+        }
+        if (!party.city.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            path: [path, "city"],
+            message: t("wizard.validation.ensPartyCityRequired", {
+              party: partyLabel,
+            }),
+          });
+        }
+        if (!party.country.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            path: [path, "country"],
+            message: t("wizard.validation.ensPartyCountryRequired", {
+              party: partyLabel,
+            }),
+          });
+        }
+      };
+
+      requireParty(values.buyer, "buyer", t("labels.buyer"));
+      requireParty(values.seller, "seller", t("labels.seller"));
+    });
+}
+
+export type SiEnsStepForm = z.infer<
+  ReturnType<typeof createSiEnsStepSchema>
+>;
+
+export interface SIFileItem {
+  id: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+  sizeKb: number;
+}
+
+export interface SIPreviewFields {
+  declaredValue?: string;
+  customerRemarks?: string;
+  aesNumber?: string;
+  aesDisclaimer?: "provided" | "not_applicable";
+  blTypeUae?: "Master BL" | "Direct BL";
+  mpciIdUae?: string;
+  acidValue?: string;
+}
+
+export interface SIDTO {
+  id: string;
+  bookingNo: string;
+  siNo: string | null;
+  blNo?: string | null;
+  agencyRefNo?: string;
+  blType: "Original" | "Seaway";
+  releaseType: "O" | "T";
+  freightOption: "PREPAID" | "COLLECT";
+  nvocc?: boolean;
+  t2lFiling?: boolean;
+  ensFilingHint?: "N" | "S" | "P";
+  origin?: string;
+  loadPort?: string;
+  dischargePort?: string;
+  delivery?: string;
+  // Modified by Sekar Nagarajan (2026-08-31 23:08) — consignee optional (assigned via parties step, not default)
+  parties: {
+    shipper: SIParty;
+    consignee?: SIParty & { toOrder: boolean };
+    notify: SIParty;
+    notify2?: SIParty;
+    notify3?: SIParty;
+    forwarder?: SIParty;
+    warehouse?: SIParty;
+    agreementParty?: SIParty;
+  };
+  routing?: SIRouting;
+  containers: SIContainer[];
+  charges?: SIChargeLine[];
+  insurance?: SIInsuranceInfo | null;
+  cargoProtect?: SICargoProtectLine[];
+  ens?: SIEnsInfo | null;
+  files?: SIFileItem[];
+  /** Dynamic reference fields (ecom-app Reference Information step). */
+  referenceFields?: ReferenceField[];
+  preview?: SIPreviewFields;
+}
+
+type SiTranslateFn = (key: string) => string;
+
+/** Step 1 — Master Details (SIBookingDetails.jsp flags) */
+export function createSiMasterDetailsSchema(t: SiTranslateFn) {
+  return z.object({
+    blType: z.enum(["Original", "Seaway"], {
+      message: t("wizard.validation.blTypeRequired"),
+    }),
+    releaseType: z.enum(["O", "T"], {
+      message: t("wizard.validation.releaseTypeRequired"),
+    }),
+    freightOption: z.enum(["PREPAID", "COLLECT"], {
+      message: t("wizard.validation.freightOptionRequired"),
+    }),
+    nvocc: z.boolean().optional(),
+    t2lFiling: z.boolean().optional(),
+    ensFilingHint: z.enum(["N", "S", "P"]).optional(),
+    agencyRefNo: z.string().optional(),
+  });
+}
+export const siMasterDetailsSchema = createSiMasterDetailsSchema((key) => key);
+export type SiMasterDetailsForm = z.infer<
+  ReturnType<typeof createSiMasterDetailsSchema>
+>;
+
+/** Step 2 — Parties */
+export function createSiPartiesSchema(t: SiTranslateFn) {
+  return z.object({
+    shipperName: z.string().min(1, t("wizard.validation.bookingPartyRequired")),
+    shipperAddress: z
+      .string()
+      .min(1, t("wizard.validation.bookingPartyAddressRequired")),
+    shipperPrint: z.boolean(),
+    consigneeName: z
+      .string()
+      .min(1, t("wizard.validation.consigneeNameRequired")),
+    consigneeAddress: z
+      .string()
+      .min(1, t("wizard.validation.consigneeAddressRequired")),
+    consigneePrint: z.boolean(),
+    consigneeToOrder: z.boolean(),
+    notifyName: z.string().min(1, t("wizard.validation.notifyRequired")),
+    notifyAddress: z
+      .string()
+      .min(1, t("wizard.validation.notifyAddressRequired")),
+    notifyPrint: z.boolean(),
+  });
+}
+export const siPartiesSchema = createSiPartiesSchema((key) => key);
+export type SiPartiesForm = z.infer<ReturnType<typeof createSiPartiesSchema>>;
+
+export function createSiRoutingStepSchema(t: SiTranslateFn) {
+  return z.object({
+    originPrint: z
+      .string()
+      .min(1, t("wizard.validation.originPrintRequired")),
+    polPrint: z
+      .string()
+      .min(1, t("wizard.validation.loadPortPrintRequired")),
+    podPrint: z
+      .string()
+      .min(1, t("wizard.validation.dischargePortPrintRequired")),
+    deliveryPrint: z
+      .string()
+      .min(1, t("wizard.validation.deliveryPrintRequired")),
+    vesselVoyage: z.string().optional(),
+  });
+}
+export const siRoutingStepSchema = createSiRoutingStepSchema((key) => key);
+export type SiRoutingStepValues = z.infer<
+  ReturnType<typeof createSiRoutingStepSchema>
+>;
+
+export function createSiChargeLineSchema(t: SiTranslateFn) {
+  return z.object({
+    id: z.string(),
+    chargeCode: z.string().min(1, t("wizard.validation.chargeCodeRequired")),
+    description: z
+      .string()
+      .min(1, t("wizard.validation.descriptionRequired")),
+    amount: z.number().min(0),
+    currency: z.string().min(1),
+    prepaidCollect: z.enum(["PREPAID", "COLLECT", "PAY_AT"]),
+    payByCustType: z.string().min(1, t("wizard.validation.payorRequired")),
+    prepaidAmount: z.number().optional(),
+    collectAmount: z.number().optional(),
+    payAtAmount: z.number().optional(),
+  });
+}
+export const siChargeLineSchema = createSiChargeLineSchema((key) => key);
+
+export function createSiChargesStepSchema(t: SiTranslateFn) {
+  return z.object({
+    charges: z
+      .array(createSiChargeLineSchema(t))
+      .min(1, t("wizard.validation.atLeastOneCharge")),
+  });
+}
+export const siChargesStepSchema = createSiChargesStepSchema((key) => key);
+export type SiChargesStepValues = z.infer<
+  ReturnType<typeof createSiChargesStepSchema>
+>;
+
+export const siPreviewStepSchema = z.object({
+  declaredValue: z.string().optional(),
+  customerRemarks: z.string().optional(),
+  aesNumber: z.string().optional(),
+  aesDisclaimer: z.enum(["provided", "not_applicable"]).optional(),
+  blTypeUae: z.enum(["Master BL", "Direct BL"]).optional(),
+  mpciIdUae: z.string().max(10).optional(),
+  acidValue: z.string().optional(),
+});
+export type SiPreviewStepValues = z.infer<typeof siPreviewStepSchema>;
+
+const newCargoLineId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `cargo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export function createSiCargoLineSchema(t: SiTranslateFn) {
+  return z.object({
+    id: z.string().min(1),
+    hsCode: z.string().min(1, t("wizard.validation.commodityCodeRequired")),
+    commodityCode: z.string().optional(),
+    packageType: z.string().min(1, t("wizard.validation.packageTypeRequired")),
+    packageCount: z.number().min(1, t("wizard.validation.quantityRequired")),
+    grossWeight: z.number().min(1, t("wizard.validation.weightRequired")),
+    // Modified by Sekar Nagarajan (2026-08-28 17:03)
+    netWeight: z.number().min(0).optional(),
+    volume: z.number().min(0, t("wizard.validation.volumeRequired")),
+    description: z
+      .string()
+      .min(1, t("wizard.validation.commodityDescriptionRequired")),
+    marksAndNumbers: z.string().optional(),
+    // Modified by Sekar Nagarajan (2026-08-28 12:22)
+    isDangerousGoods: z.boolean().optional().default(false),
+    unNumber: z.string().optional(),
+    dgClass: z.string().optional(),
+    flashPoint: z.string().optional(),
+    marinePollutant: z.boolean().optional().default(false),
+    shippingName: z.string().optional(),
+  });
+}
+export const siCargoLineSchema = createSiCargoLineSchema((key) => key);
+
+function createSiContainerCargoSchema(t: SiTranslateFn) {
+  return z.object({
+    id: z.string(),
+    containerNo: z.string(),
+    eqpSize: z.string(),
+    carrierSeal: z.string().optional(),
+    shipperSeal: z.string().optional(),
+    cargoLines: z
+      .array(createSiCargoLineSchema(t))
+      .min(1, t("wizard.validation.atLeastOneCommodity")),
+  });
+}
+
+export function createSiCargoStepSchema(t: SiTranslateFn) {
+  return z
+    .object({
+      containers: z.array(createSiContainerCargoSchema(t)).min(1),
+    })
+    .superRefine((data, ctx) => {
+      data.containers.forEach((container, ci) => {
+        container.cargoLines.forEach((line, mi) => {
+          if (!line.isDangerousGoods) return;
+          if (!line.unNumber || line.unNumber.trim() === "") {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("wizard.validation.unNoRequired"),
+              path: ["containers", ci, "cargoLines", mi, "unNumber"],
+            });
+          }
+          if (!line.dgClass || line.dgClass.trim() === "") {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("wizard.validation.dgClassRequired"),
+              path: ["containers", ci, "cargoLines", mi, "dgClass"],
+            });
+          }
+        });
+      });
+    });
+}
+export const siCargoStepSchema = createSiCargoStepSchema((key) => key);
+export type SiCargoStepForm = z.infer<
+  ReturnType<typeof createSiCargoStepSchema>
+>;
+
+export function createEmptyCargoLine(): SICargoLine {
+  return {
+    id: newCargoLineId(),
+    marksAndNumbers: "",
+    description: "",
+    commodityCode: "",
+    hsCode: "",
+    packageCount: 1,
+    packageType: "",
+    grossWeight: 1,
+    volume: 0,
+    isDangerousGoods: false,
+    unNumber: "",
+    dgClass: "",
+    flashPoint: "",
+    marinePollutant: false,
+    shippingName: "",
+  };
+}
+
+// Modified by Sekar Nagarajan (2026-08-28 16:43)
+export function createEmptyContainer(eqpSize = "40HC"): SIContainer {
+  return {
+    id: newCargoLineId(),
+    containerNo: "",
+    eqpSize,
+    carrierSeal: "",
+    shipperSeal: "",
+    cargoLines: [createEmptyCargoLine()],
+    isSoc: false,
+    isOog: false,
+    reeferMode: "none",
+  };
+}
+
+/** Shared wizard step contract — all SI steps. */
+export interface SIWizardStepProps {
+  data: SIDTO;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSubmit: () => void;
+  onUpdate: (partial: Partial<SIDTO>) => void;
+  onCancel: () => void;
+  /** Jump to a wizard step by id (Preview section Edit). */
+  onGoToStep?: (stepId: SIWizardStepId) => void;
+  isFirstStep: boolean;
+  isLastStep: boolean;
+  isSubmitting: boolean;
+}

@@ -1,0 +1,57 @@
+package com.solverminds.summary.security;
+
+import com.svm.ecom.security.JwtUtil; // from common-security
+import io.jsonwebtoken.Claims;
+import org.springframework.stereotype.Component;
+
+@Component("summaryCustomerContext")
+public class CustomerContext {
+
+    private final JwtUtil jwtUtil;
+
+    public CustomerContext(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+
+    /**
+     * Extract and validate JWT token, then extract customerCode claim
+     */
+    public String extractCustomerCodeFromToken(String token) {
+        try {
+            // 1. Validate the token first
+            jwtUtil.validateTokenWithSession(token);
+            
+            // 2. Get the claims to extract customerCode
+            Claims claims = extractClaimsFromToken(token);
+            Object customerCodeObj = claims.get("customerCode");
+            
+            if (customerCodeObj == null) {
+                throw new SecurityException("customerCode claim missing in token");
+            }
+            
+            return String.valueOf(customerCodeObj);
+            
+        } catch (SecurityException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new SecurityException("JWT validation failed: " + e.getMessage());
+        } catch (Exception e) {
+            throw new SecurityException("Token processing failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper method to extract claims from JWT token using reflection
+     * since getClaims is private in JwtUtil
+     */
+    private Claims extractClaimsFromToken(String token) {
+        try {
+            // Use reflection to access the private getClaims method
+            java.lang.reflect.Method getClaimsMethod = JwtUtil.class.getDeclaredMethod("getClaims", String.class);
+            getClaimsMethod.setAccessible(true);
+            return (Claims) getClaimsMethod.invoke(jwtUtil, token);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract claims from token: " + e.getMessage());
+        }
+    }
+}
